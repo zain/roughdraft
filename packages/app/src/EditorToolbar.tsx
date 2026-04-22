@@ -52,7 +52,11 @@ function ToolbarButton({
   return (
     <button
       type="button"
-      className={`editor-toolbar-button ${active ? "is-active" : ""}`}
+      className={`inline-flex size-8 items-center justify-center rounded-xl border text-slate-700 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:pointer-events-none disabled:opacity-40 ${
+        active
+          ? "border-sky-200 bg-sky-50 text-sky-700 shadow-sm"
+          : "border-transparent hover:border-slate-300 hover:bg-white"
+      }`}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
       disabled={disabled}
@@ -132,10 +136,13 @@ export function EditorToolbar({ editor, onPickFiles }: EditorToolbarProps) {
   };
 
   return (
-    <div className="editor-toolbar" onPointerDown={(event) => event.stopPropagation()}>
-      <div className="editor-toolbar-group">
+    <div
+      className="mb-4 flex min-h-11 flex-wrap items-center gap-2 border-b border-slate-200/80 pb-4"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <div className="inline-flex items-center gap-0.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm">
         <select
-          className="editor-toolbar-select"
+          className="h-8 min-w-40 rounded-xl border border-transparent bg-transparent px-3 text-sm font-medium text-slate-700 outline-none transition hover:border-slate-300 hover:bg-white focus:border-sky-400 focus:bg-white"
           aria-label="Block type"
           value={blockType}
           onChange={(event) => handleBlockChange(event.target.value as BlockType)}
@@ -148,8 +155,12 @@ export function EditorToolbar({ editor, onPickFiles }: EditorToolbarProps) {
           <option value="codeBlock">Code block</option>
         </select>
       </div>
-      <div className="editor-toolbar-separator" aria-hidden="true" />
-      <div className="editor-toolbar-group" aria-label="Text formatting" role="group">
+      <div className="hidden h-8 w-px bg-slate-200 sm:block" aria-hidden="true" />
+      <div
+        className="inline-flex items-center gap-0.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm"
+        aria-label="Text formatting"
+        role="group"
+      >
         <ToolbarButton
           active={editor.isActive("bold")}
           disabled={!editor.can().chain().focus().toggleBold().run()}
@@ -175,8 +186,12 @@ export function EditorToolbar({ editor, onPickFiles }: EditorToolbarProps) {
           <Code2 size={16} />
         </ToolbarButton>
       </div>
-      <div className="editor-toolbar-separator" aria-hidden="true" />
-      <div className="editor-toolbar-group" aria-label="Lists" role="group">
+      <div className="hidden h-8 w-px bg-slate-200 sm:block" aria-hidden="true" />
+      <div
+        className="inline-flex items-center gap-0.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm"
+        aria-label="Lists"
+        role="group"
+      >
         <ToolbarButton
           active={editor.isActive("bulletList")}
           disabled={!editor.can().chain().focus().toggleBulletList().run()}
@@ -202,8 +217,12 @@ export function EditorToolbar({ editor, onPickFiles }: EditorToolbarProps) {
           <CheckSquare size={16} />
         </ToolbarButton>
       </div>
-      <div className="editor-toolbar-separator" aria-hidden="true" />
-      <div className="editor-toolbar-group" aria-label="Insert" role="group">
+      <div className="hidden h-8 w-px bg-slate-200 sm:block" aria-hidden="true" />
+      <div
+        className="inline-flex items-center gap-0.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm"
+        aria-label="Insert"
+        role="group"
+      >
         <ToolbarButton
           active={editor.isActive("link")}
           label="Link"
@@ -227,8 +246,12 @@ export function EditorToolbar({ editor, onPickFiles }: EditorToolbarProps) {
           <Upload size={16} />
         </ToolbarButton>
       </div>
-      <div className="editor-toolbar-separator" aria-hidden="true" />
-      <div className="editor-toolbar-group" aria-label="History" role="group">
+      <div className="hidden h-8 w-px bg-slate-200 sm:block" aria-hidden="true" />
+      <div
+        className="inline-flex items-center gap-0.5 rounded-2xl border border-slate-200 bg-slate-50/80 p-1 shadow-sm"
+        aria-label="History"
+        role="group"
+      >
         <ToolbarButton
           label="Undo"
           disabled={!editor.can().chain().focus().undo().run()}

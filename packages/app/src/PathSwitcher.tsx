@@ -150,67 +150,91 @@ export function PathSwitcher({
   };
 
   return (
-    <div className="path-switcher" ref={rootRef}>
+    <div className="relative" ref={rootRef}>
       <button
-        className="path-switcher-trigger"
+        className="inline-flex h-[2.85rem] w-full min-w-0 items-center justify-between gap-3 rounded-full border border-slate-200/80 bg-white/[0.88] px-4 py-0 text-left text-slate-900 shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:border-slate-300 hover:bg-white/95 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-300"
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       >
-        <span className="path-switcher-label" title={currentPath ?? projectPath ?? currentLabel}>
+        <span
+          className="min-w-0 truncate text-[0.95rem] font-semibold tracking-[-0.02em]"
+          title={currentPath ?? projectPath ?? currentLabel}
+        >
           {currentLabel}
         </span>
-        <ChevronDown className={open ? "path-switcher-chevron open" : "path-switcher-chevron"} size={16} />
+        <ChevronDown
+          className={`shrink-0 text-slate-500 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+          size={16}
+        />
       </button>
 
       {open ? (
-        <div className="path-switcher-menu" role="menu" aria-label="Open another file or folder">
+        <div
+          className="absolute top-[calc(100%+0.55rem)] left-0 max-h-[min(70vh,560px)] w-[min(440px,calc(100vw-40px))] overflow-auto rounded-3xl border border-slate-200/80 bg-white/96 p-2 shadow-[0_18px_48px_rgba(15,23,42,0.16)] backdrop-blur-xl"
+          role="menu"
+          aria-label="Open another file or folder"
+        >
           {fileOptions.length > 0 ? (
-            <div className="path-switcher-section">
-              <div className="path-switcher-section-label">Files</div>
+            <div>
+              <div className="px-2.5 pt-1 pb-2 text-[0.72rem] font-bold tracking-[0.12em] text-slate-500 uppercase">
+                Files
+              </div>
               {fileOptions.map((option) => (
                 <button
                   key={option.path}
-                  className={option.active ? "path-switcher-item active" : "path-switcher-item"}
+                  className={`flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left transition ${
+                    option.active
+                      ? "bg-sky-50 text-sky-950"
+                      : "text-slate-900 hover:bg-slate-50"
+                  }`}
                   type="button"
                   role="menuitem"
                   onClick={() => openPathInNewTab(option.path)}
                 >
-                  <span className="path-switcher-item-copy">
-                    <FileText size={14} />
-                    <span className="path-switcher-item-label">{option.label}</span>
+                  <span className="inline-flex min-w-0 items-center gap-2.5">
+                    <FileText className="shrink-0" size={14} />
+                    <span className="truncate text-[0.92rem]">{option.label}</span>
                   </span>
-                  <ExternalLink size={13} />
+                  <ExternalLink className="shrink-0 text-slate-400" size={13} />
                 </button>
               ))}
             </div>
           ) : null}
 
-          <div className="path-switcher-section">
-            <div className="path-switcher-section-label">Folders</div>
+          <div className={fileOptions.length > 0 ? "mt-2 border-t border-slate-200/80 pt-2" : ""}>
+            <div className="px-2.5 pt-1 pb-2 text-[0.72rem] font-bold tracking-[0.12em] text-slate-500 uppercase">
+              Folders
+            </div>
             {loading ? (
-              <div className="path-switcher-empty">Loading folders...</div>
+              <div className="px-3 py-3 text-sm text-slate-500">Loading folders...</div>
             ) : error ? (
-              <div className="path-switcher-empty">{error}</div>
+              <div className="px-3 py-3 text-sm text-slate-500">{error}</div>
             ) : directoryOptions.length > 0 ? (
               directoryOptions.map((option) => (
                 <button
                   key={option.path}
-                  className={option.active ? "path-switcher-item active" : "path-switcher-item"}
+                  className={`flex w-full items-center justify-between gap-3 rounded-2xl px-3 py-3 text-left transition ${
+                    option.active
+                      ? "bg-sky-50 text-sky-950"
+                      : "text-slate-900 hover:bg-slate-50"
+                  }`}
                   type="button"
                   role="menuitem"
                   onClick={() => openPathInNewTab(option.path)}
                 >
-                  <span className="path-switcher-item-copy">
-                    <Folder size={14} />
-                    <span className="path-switcher-item-label">{option.label}</span>
+                  <span className="inline-flex min-w-0 items-center gap-2.5">
+                    <Folder className="shrink-0" size={14} />
+                    <span className="truncate text-[0.92rem]">{option.label}</span>
                   </span>
-                  <ExternalLink size={13} />
+                  <ExternalLink className="shrink-0 text-slate-400" size={13} />
                 </button>
               ))
             ) : (
-              <div className="path-switcher-empty">No folders available.</div>
+              <div className="px-3 py-3 text-sm text-slate-500">No folders available.</div>
             )}
           </div>
         </div>

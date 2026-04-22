@@ -91,7 +91,8 @@ export function PageCard({
       immediatelyRender: false,
       editorProps: {
         attributes: {
-          class: "tiptap",
+          class:
+            "tiptap min-h-[120px] text-[1.05rem] leading-8 text-slate-800 outline-none selection:bg-sky-100",
         },
         handleDrop: (_view, event) => {
           const files = Array.from(event.dataTransfer?.files ?? []);
@@ -191,28 +192,38 @@ export function PageCard({
 
   return (
     <div
-      className={`page-card ${selected ? "page-card-selected" : ""}`}
+      className={`absolute w-[680px] overflow-hidden rounded-3xl border bg-white/95 shadow-[0_18px_50px_rgba(15,23,42,0.14)] backdrop-blur transition-[border-color,box-shadow] ${
+        selected
+          ? "border-sky-300 shadow-[0_28px_72px_rgba(14,116,144,0.22)]"
+          : "border-slate-200/90"
+      }`}
       style={{
-        position: "absolute",
         left: x,
         top: y,
-        width: 680,
       }}
     >
       <div
-        className="page-card-handle"
+        className="flex min-h-10 cursor-grab select-none items-center gap-2 border-b border-slate-200/80 bg-slate-50/90 px-4 active:cursor-grabbing"
         onPointerDown={handleDragPointerDown}
         onPointerMove={handleDragPointerMove}
         onPointerUp={handleDragPointerUp}
       >
-        <span className="page-card-title">{page.title}</span>
-        {saveState === "saving" ? <span className="page-card-status">Saving…</span> : null}
+        <span className="flex-1 truncate text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">
+          {page.title}
+        </span>
+        {saveState === "saving" ? (
+          <span className="text-[11px] font-medium tracking-[0.08em] text-slate-400 uppercase">
+            Saving…
+          </span>
+        ) : null}
         {saveState === "error" ? (
-          <span className="page-card-status page-card-status-error">Save failed</span>
+          <span className="text-[11px] font-medium tracking-[0.08em] text-rose-600 uppercase">
+            Save failed
+          </span>
         ) : null}
         {canDelete ? (
           <button
-            className="page-card-delete"
+            className="inline-flex size-7 items-center justify-center rounded-full border border-transparent text-lg leading-none text-slate-400 transition hover:border-rose-100 hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
             onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
@@ -224,7 +235,7 @@ export function PageCard({
           </button>
         ) : null}
       </div>
-      <div className="page-card-body" onPointerDown={handleBodyPointerDown}>
+      <div className="cursor-text bg-white px-5 pt-4 pb-6" onPointerDown={handleBodyPointerDown}>
         <EditorToolbar editor={editor} onPickFiles={insertFiles} />
         <EditorContextMenu editor={editor} backend={backend}>
           <EditorContent editor={editor} />

@@ -271,15 +271,8 @@ export function App() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-        }}
-      >
-        <p>Loading...</p>
+      <div className="flex h-screen items-center justify-center bg-slate-950 text-sm font-medium tracking-[0.18em] text-slate-200 uppercase">
+        <p>Loading canvas...</p>
       </div>
     );
   }
@@ -290,7 +283,7 @@ export function App() {
 
   return (
     <>
-      <div className="app-chrome">
+      <div className="fixed top-4 left-4 z-[110] w-[calc(100vw-2rem)] max-w-[380px] sm:top-5 sm:left-5 sm:w-[min(380px,calc(100vw-40px))]">
         {backend ? (
           <PathSwitcher
             backend={backend}
@@ -323,7 +316,11 @@ export function App() {
         })}
       </Canvas>
       {!isSinglePageMode ? (
-        <button className="create-page-btn" onClick={handleCreatePage} title="New page">
+        <button
+          className="fixed right-6 bottom-6 z-[100] flex size-14 items-center justify-center rounded-full border border-slate-900/10 bg-white text-[2rem] leading-none text-slate-950 shadow-[0_24px_60px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-sky-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+          onClick={handleCreatePage}
+          title="New page"
+        >
           +
         </button>
       ) : null}

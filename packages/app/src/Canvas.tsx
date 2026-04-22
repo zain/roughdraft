@@ -625,10 +625,7 @@ export function Canvas({ children, onPointerDownOnCanvas }: CanvasProps) {
 
       // Only start panning if clicking directly on the canvas container or inner div
       const target = e.target as HTMLElement;
-      if (
-        target.classList.contains("canvas-container") ||
-        target.classList.contains("canvas-inner")
-      ) {
+      if (target.dataset.canvasSurface === "true") {
         e.preventDefault();
         resetZoomGesture();
         stopZoomMomentum();
@@ -674,58 +671,101 @@ export function Canvas({ children, onPointerDownOnCanvas }: CanvasProps) {
     <CanvasScaleContext.Provider value={camera.z}>
       <div
         ref={containerRef}
-        className={`canvas-container ${isPanning ? "canvas-grabbing" : "canvas-grab"}`}
+        data-canvas-surface="true"
+        className={`relative size-full overflow-hidden overscroll-none touch-none ${
+          isPanning ? "cursor-grabbing" : "cursor-grab"
+        }`}
+        style={{
+          background:
+            "radial-gradient(circle at top left, rgba(63, 140, 255, 0.22), transparent 34%), radial-gradient(circle at bottom right, rgba(24, 87, 180, 0.18), transparent 28%), linear-gradient(180deg, #07101d 0%, #091523 48%, #08111b 100%)",
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
       >
-        <div className="canvas-backdrop" aria-hidden="true" />
-        <div className="canvas-ruler canvas-ruler-top" aria-hidden="true">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-25"
+          aria-hidden="true"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(194, 228, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(194, 228, 255, 0.05) 1px, transparent 1px)",
+            backgroundSize: "24px 24px",
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 z-20 h-9 overflow-hidden border-b border-sky-100/15 bg-slate-950/70 text-[10px] font-semibold tracking-[0.02em] text-sky-100/65 backdrop-blur-xl shadow-[inset_0_0_0_1px_rgba(158,202,255,0.08)]"
+          aria-hidden="true"
+        >
           {horizontalTicks.map((tick) => (
             <div
               key={`x-${tick.value}`}
-              className={`canvas-ruler-tick canvas-ruler-tick-top ${
-                tick.isMajor ? "is-major" : ""
-              }`}
+              className="absolute bottom-0 -translate-x-[0.5px]"
               style={{ left: `${tick.screen}px` }}
             >
-              <span className="canvas-ruler-mark" />
+              <span
+                className={`mt-auto block w-px ${
+                  tick.isMajor ? "h-3.5 bg-sky-50/75" : "h-2 bg-sky-100/30"
+                }`}
+              />
               {tick.isMajor ? (
-                <span className="canvas-ruler-label">
+                <span className="absolute top-[5px] left-[6px] text-sky-50/80 [text-shadow:0_1px_0_rgba(4,10,17,0.9)]">
                   {formatRulerValue(tick.value)}
                 </span>
               ) : null}
             </div>
           ))}
         </div>
-        <div className="canvas-ruler canvas-ruler-left" aria-hidden="true">
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 z-20 w-9 overflow-hidden border-r border-sky-100/15 bg-slate-950/70 text-[10px] font-semibold tracking-[0.02em] text-sky-100/65 backdrop-blur-xl shadow-[inset_0_0_0_1px_rgba(158,202,255,0.08)]"
+          aria-hidden="true"
+        >
           {verticalTicks.map((tick) => (
             <div
               key={`y-${tick.value}`}
-              className={`canvas-ruler-tick canvas-ruler-tick-left ${
-                tick.isMajor ? "is-major" : ""
-              }`}
+              className="absolute right-0 -translate-y-[0.5px]"
               style={{ top: `${tick.screen}px` }}
             >
-              <span className="canvas-ruler-mark" />
+              <span
+                className={`ml-auto block ${
+                  tick.isMajor ? "h-px w-3.5 bg-sky-50/75" : "h-px w-2 bg-sky-100/30"
+                }`}
+              />
               {tick.isMajor ? (
-                <span className="canvas-ruler-label">
+                <span className="absolute top-[6px] right-[18px] origin-top-right -rotate-90 whitespace-nowrap text-sky-50/80 [text-shadow:0_1px_0_rgba(4,10,17,0.9)]">
                   {formatRulerValue(tick.value)}
                 </span>
               ) : null}
             </div>
           ))}
         </div>
-        <div className="canvas-ruler-corner" aria-hidden="true" />
         <div
-          className="canvas-inner"
+          className="pointer-events-none absolute top-0 left-0 z-[21] size-9 border-r border-b border-sky-100/15 shadow-[inset_0_0_0_1px_rgba(158,202,255,0.08)]"
+          aria-hidden="true"
+          style={{
+            background:
+              "linear-gradient(135deg, rgba(120, 179, 255, 0.14), transparent 70%), rgba(4, 10, 17, 0.82)",
+          }}
+        />
+        <div
+          data-canvas-surface="true"
+          className="absolute top-0 left-0 will-change-transform"
           style={{
             transform: `translate(${camera.x}px, ${camera.y}px) scale(${camera.z})`,
             transformOrigin: "0 0",
           }}
         >
-          <div className="canvas-grid" aria-hidden="true" />
+          <div
+            className="pointer-events-none absolute -top-[24000px] -left-[24000px] h-[48000px] w-[48000px] opacity-95"
+            aria-hidden="true"
+            style={{
+              backgroundColor: "transparent",
+              backgroundImage:
+                "linear-gradient(rgba(167, 214, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(167, 214, 255, 0.1) 1px, transparent 1px), linear-gradient(rgba(223, 243, 255, 0.18) 1px, transparent 1px), linear-gradient(90deg, rgba(223, 243, 255, 0.18) 1px, transparent 1px)",
+              backgroundRepeat: "repeat",
+              backgroundSize: "24px 24px, 24px 24px, 120px 120px, 120px 120px",
+            }}
+          />
           {children}
         </div>
       </div>
