@@ -40,6 +40,19 @@ npx roughdraft ~/writing/my-essay
 
 Open a specific project folder.
 
+## Local development
+
+```bash
+./scripts/setup.sh
+./scripts/run.sh
+```
+
+`./scripts/setup.sh` installs workspace dependencies and builds the app and server. `./scripts/run.sh` serves the built app at `http://localhost:3000`.
+
+The two scripts coordinate through a lock file, so it's safe to start `./scripts/run.sh` while `./scripts/setup.sh` is still in progress. `run` will wait for setup to finish, or trigger setup itself if nothing has been built yet.
+
+If you prefer package scripts, the same commands are available as `pnpm setup` and `pnpm start`.
+
 ## What's in the folder
 
 ```
