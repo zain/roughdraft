@@ -32,6 +32,20 @@ export interface DirectoryListing {
   directories: DirectoryEntry[];
 }
 
+export interface FileSystemEntry {
+  name: string;
+  path: string;
+  kind: "directory" | "file";
+}
+
+export interface FileSystemListing {
+  path: string;
+  displayPath: string;
+  parentPath: string | null;
+  directories: FileSystemEntry[];
+  files: FileSystemEntry[];
+}
+
 export interface ProjectTreeListing {
   paths: string[];
 }
@@ -41,7 +55,9 @@ export interface StorageBackend {
   canManageProjects: boolean;
   listPages(): Promise<Page[]>;
   getPage(id: string): Promise<Page>;
+  getMarkdownFile(relativePath: string): Promise<Page>;
   savePage(id: string, content: string): Promise<void>;
+  saveMarkdownFile(relativePath: string, content: string): Promise<void>;
   createPage(title?: string, content?: string): Promise<Page>;
   deletePage(id: string): Promise<void>;
   getProject(): Promise<ProjectLayout>;
@@ -49,6 +65,7 @@ export interface StorageBackend {
   saveAsset(file: File): Promise<StoredAsset>;
   resolveFileUrl(path: string): string | null;
   listDirectories(path?: string): Promise<DirectoryListing>;
+  listFileSystem(path?: string): Promise<FileSystemListing>;
   listProjectTree(): Promise<ProjectTreeListing>;
   openProject(path: string): Promise<void>;
   createProject(path: string): Promise<void>;

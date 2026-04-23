@@ -17,6 +17,13 @@ interface CanvasProps {
     y: number;
   } | null;
   initialWorldCenterKey?: string;
+  focusedWorldFrame?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+  focusedWorldFrameKey?: string | null;
 }
 
 interface Camera {
@@ -145,6 +152,8 @@ export function Canvas({
   onPointerDownOnCanvas,
   initialWorldCenter,
   initialWorldCenterKey,
+  focusedWorldFrame,
+  focusedWorldFrameKey,
 }: CanvasProps) {
   const cameraRef = useRef<Camera>({ x: 0, y: 0, z: 1 });
   const [camera, setCameraState] = useState<Camera>(cameraRef.current);
@@ -153,6 +162,7 @@ export function Canvas({
   const lastPointer = useRef({ x: 0, y: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
   const lastInitialWorldCenterKeyRef = useRef<string | null>(null);
+  const lastFocusedWorldFrameKeyRef = useRef<string | null>(null);
   const isPinchingRef = useRef(false);
   const touchPinchRef = useRef({
     state: "not-sure" as PinchState,
@@ -395,6 +405,34 @@ export function Canvas({
       z: 1,
     });
   }, [initialWorldCenter, initialWorldCenterKey, setCamera, viewport.height, viewport.width]);
+
+  useEffect(() => {
+    if (!focusedWorldFrame || !focusedWorldFrameKey) return;
+    if (viewport.width <= 0 || viewport.height <= 0) return;
+    if (lastFocusedWorldFrameKeyRef.current === focusedWorldFrameKey) return;
+    lastFocusedWorldFrameKeyRef.current = focusedWorldFrameKey;
+
+    const availableWidth = Math.max(1, viewport.width - RULER_SIZE_PX);
+    const availableHeight = Math.max(1, viewport.height - RULER_SIZE_PX);
+    const framePadding = 120;
+    const targetZoom = clampZoom(
+      Math.min(
+        1.1,
+        availableWidth / (focusedWorldFrame.width + framePadding * 2),
+        availableHeight / (focusedWorldFrame.height + framePadding * 2)
+      )
+    );
+    const visibleCenterX = RULER_SIZE_PX + availableWidth / 2;
+    const visibleCenterY = RULER_SIZE_PX + availableHeight / 2;
+    const frameCenterX = focusedWorldFrame.x + focusedWorldFrame.width / 2;
+    const frameCenterY = focusedWorldFrame.y + focusedWorldFrame.height / 2;
+
+    setCamera({
+      x: visibleCenterX - frameCenterX * targetZoom,
+      y: visibleCenterY - frameCenterY * targetZoom,
+      z: targetZoom,
+    });
+  }, [focusedWorldFrame, focusedWorldFrameKey, setCamera, viewport.height, viewport.width]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -758,7 +796,7 @@ export function Canvas({
           isPanning ? "cursor-grabbing" : "cursor-grab"
         }`}
         style={{
-          background: "#f8fafc",
+          background: "#ffffff",
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}

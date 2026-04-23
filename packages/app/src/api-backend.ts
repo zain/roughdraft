@@ -1,6 +1,7 @@
 import type {
   BackendInfo,
   DirectoryListing,
+  FileSystemListing,
   Page,
   ProjectLayout,
   ProjectTreeListing,
@@ -51,6 +52,18 @@ export class ApiBackend implements StorageBackend {
     return res.json();
   }
 
+  async getMarkdownFile(relativePath: string): Promise<Page> {
+    const res = await fetch(
+      this.buildUrl("/api/markdown-file", {
+        path: relativePath,
+      })
+    );
+    if (!res.ok) {
+      throw new Error(`Failed to get markdown file ${relativePath}: ${res.status}`);
+    }
+    return res.json();
+  }
+
   async savePage(id: string, content: string): Promise<void> {
     const res = await fetch(this.buildUrl(`/api/pages/${encodeURIComponent(id)}`), {
       method: "PUT",
@@ -58,6 +71,17 @@ export class ApiBackend implements StorageBackend {
       body: JSON.stringify({ content, projectPath: this.info.projectPath }),
     });
     if (!res.ok) throw new Error(`Failed to save page ${id}: ${res.status}`);
+  }
+
+  async saveMarkdownFile(relativePath: string, content: string): Promise<void> {
+    const res = await fetch(this.buildUrl("/api/markdown-file", { path: relativePath }), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content, projectPath: this.info.projectPath }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to save markdown file ${relativePath}: ${res.status}`);
+    }
   }
 
   async createPage(title?: string, content?: string): Promise<Page> {
@@ -124,6 +148,13 @@ export class ApiBackend implements StorageBackend {
     const query = path ? `?path=${encodeURIComponent(path)}` : "";
     const res = await fetch(`/api/directories${query}`);
     if (!res.ok) throw new Error(`Failed to list directories: ${res.status}`);
+    return res.json();
+  }
+
+  async listFileSystem(path?: string): Promise<FileSystemListing> {
+    const query = path ? `?path=${encodeURIComponent(path)}` : "";
+    const res = await fetch(`/api/fs/list${query}`);
+    if (!res.ok) throw new Error(`Failed to list file system: ${res.status}`);
     return res.json();
   }
 

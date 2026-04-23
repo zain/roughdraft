@@ -1,4 +1,5 @@
 import express, { type Request, type Response } from "express";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
@@ -32,6 +33,20 @@ interface DirectoryListing {
   path: string;
   parentPath: string | null;
   directories: DirectoryEntry[];
+}
+
+interface FileSystemEntry {
+  name: string;
+  path: string;
+  kind: "directory" | "file";
+}
+
+interface FileSystemListing {
+  path: string;
+  displayPath: string;
+  parentPath: string | null;
+  directories: FileSystemEntry[];
+  files: FileSystemEntry[];
 }
 
 interface ProjectTreeListing {
@@ -70,6 +85,10 @@ function listMdFiles(projectDir: string): string[] {
 function titleFromContent(content: string, fallback: string): string {
   const firstLine = content.split("\n")[0] || "";
   return firstLine.replace(/^#*\s*/, "").trim() || fallback;
+}
+
+function pageIdFromRelativePath(relativePath: string): string {
+  return relativePath.replace(/\.md$/i, "").split(path.sep).join("/");
 }
 
 function nextUntitledId(projectDir: string): string {
@@ -149,6 +168,64 @@ function listDirectories(dir: string): DirectoryListing {
   };
 }
 
+function formatDisplayPath(targetPath: string, homeDir: string): string {
+  const normalizedHome = path.resolve(homeDir);
+  const normalizedTarget = path.resolve(targetPath);
+
+  if (normalizedTarget === normalizedHome) {
+    return "~";
+  }
+
+  const relativeToHome = path.relative(normalizedHome, normalizedTarget);
+  if (!relativeToHome.startsWith("..") && !path.isAbsolute(relativeToHome)) {
+    return `~/${relativeToHome.split(path.sep).join("/")}`;
+  }
+
+  return normalizedTarget;
+}
+
+function listFileSystem(dir: string, homeDir: string): FileSystemListing {
+  const normalizedDir = path.resolve(dir);
+  const normalizedHome = path.resolve(homeDir);
+
+  let rawEntries: fs.Dirent[];
+  try {
+    rawEntries = fs.readdirSync(normalizedDir, { withFileTypes: true });
+  } catch (error) {
+    const errorCode = (error as NodeJS.ErrnoException).code;
+    if (errorCode === "EACCES" || errorCode === "EPERM") {
+      throw new Error("Directory is not readable.");
+    }
+    throw error;
+  }
+
+  const directories = rawEntries
+    .filter((entry) => entry.isDirectory())
+    .map<FileSystemEntry>((entry) => ({
+      name: entry.name,
+      path: path.join(normalizedDir, entry.name),
+      kind: "directory",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  const files = rawEntries
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md"))
+    .map<FileSystemEntry>((entry) => ({
+      name: entry.name,
+      path: path.join(normalizedDir, entry.name),
+      kind: "file",
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+  return {
+    path: normalizedDir,
+    displayPath: formatDisplayPath(normalizedDir, normalizedHome),
+    parentPath: normalizedDir === normalizedHome ? null : path.dirname(normalizedDir),
+    directories,
+    files,
+  };
+}
+
 function toCanonicalRelativePath(projectDir: string, absolutePath: string, isDirectory: boolean): string {
   const relativePath = path.relative(projectDir, absolutePath);
   const canonicalPath = relativePath.split(path.sep).join("/");
@@ -191,6 +268,7 @@ function listProjectTree(projectDir: string): ProjectTreeListing {
 
 export function createServer(port = 3000, projectDir?: string): void {
   const defaultProjectDir = path.resolve(projectDir || process.cwd());
+  const homeDir = os.homedir();
   const app = express();
 
   ensureDirectoryExists(defaultProjectDir);
@@ -251,6 +329,27 @@ export function createServer(port = 3000, projectDir?: string): void {
     res.json({ id, title: titleFromContent(content, id), content });
   });
 
+  app.get("/api/markdown-file", (req, res) => {
+    const projectDir = projectDirFromRequest(req, res);
+    if (!projectDir) return;
+
+    const relativePath = typeof req.query.path === "string" ? req.query.path : "";
+    const absolutePath = ensureProjectPath(projectDir, relativePath);
+
+    if (!absolutePath || !absolutePath.toLowerCase().endsWith(".md") || !fs.existsSync(absolutePath)) {
+      res.status(404).json({ error: "Markdown file not found" });
+      return;
+    }
+
+    const content = fs.readFileSync(absolutePath, "utf-8");
+    const fallbackTitle = path.basename(relativePath, ".md");
+    res.json({
+      id: pageIdFromRelativePath(relativePath),
+      title: titleFromContent(content, fallbackTitle),
+      content,
+    });
+  });
+
   app.put("/api/pages/:id", (req, res) => {
     const projectDir = projectDirFromRequest(req, res);
     if (!projectDir) return;
@@ -264,6 +363,27 @@ export function createServer(port = 3000, projectDir?: string): void {
     const { content } = req.body as { content: string };
     fs.writeFileSync(filePath, content);
     res.json({ id, title: titleFromContent(content, id), content });
+  });
+
+  app.put("/api/markdown-file", (req, res) => {
+    const projectDir = projectDirFromRequest(req, res);
+    if (!projectDir) return;
+
+    const relativePath = typeof req.query.path === "string" ? req.query.path : "";
+    const absolutePath = ensureProjectPath(projectDir, relativePath);
+
+    if (!absolutePath || !absolutePath.toLowerCase().endsWith(".md") || !fs.existsSync(absolutePath)) {
+      res.status(404).json({ error: "Markdown file not found" });
+      return;
+    }
+
+    const { content } = req.body as { content: string };
+    fs.writeFileSync(absolutePath, content);
+    res.json({
+      id: pageIdFromRelativePath(relativePath),
+      title: titleFromContent(content, path.basename(relativePath, ".md")),
+      content,
+    });
   });
 
   app.post("/api/pages", (req, res) => {
@@ -340,6 +460,31 @@ export function createServer(port = 3000, projectDir?: string): void {
     }
 
     res.json(listDirectories(requestedPath));
+  });
+
+  app.get("/api/fs/list", (req, res) => {
+    const requestedPath =
+      typeof req.query.path === "string" && req.query.path.trim().length > 0
+        ? path.resolve(req.query.path)
+        : homeDir;
+
+    if (!fs.existsSync(requestedPath)) {
+      res.status(404).json({ error: "Directory not found" });
+      return;
+    }
+
+    if (!isExistingDirectory(requestedPath)) {
+      res.status(400).json({ error: "Path is not a directory" });
+      return;
+    }
+
+    try {
+      res.json(listFileSystem(requestedPath, homeDir));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to read directory listing";
+      res.status(500).json({ error: message });
+    }
   });
 
   app.get("/api/file-tree", (req, res) => {
