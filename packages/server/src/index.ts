@@ -687,8 +687,8 @@ export async function createServer(
             listeningHosts.push(host);
             resolve();
           });
-        })
-    )
+        }),
+    ),
   );
 
   if (listeningHosts.length === 0) {

@@ -56,7 +56,9 @@ function installCommandOnPath() {
 }
 
 function writeGuidanceBlock(targetFile) {
-  const existing = fs.existsSync(targetFile) ? fs.readFileSync(targetFile, "utf8") : "";
+  const existing = fs.existsSync(targetFile)
+    ? fs.readFileSync(targetFile, "utf8")
+    : "";
   const filteredLines = [];
   let skipping = false;
 
@@ -76,7 +78,10 @@ function writeGuidanceBlock(targetFile) {
     }
   }
 
-  while (filteredLines.length > 0 && filteredLines[filteredLines.length - 1] === "") {
+  while (
+    filteredLines.length > 0 &&
+    filteredLines[filteredLines.length - 1] === ""
+  ) {
     filteredLines.pop();
   }
 
@@ -98,9 +103,13 @@ function printHelp() {
 function runInstall() {
   logInstall(`Installing ${PACKAGE_SPEC}`);
 
-  const installResult = spawnSync("npm", ["install", "--global", PACKAGE_SPEC], {
-    stdio: "inherit",
-  });
+  const installResult = spawnSync(
+    "npm",
+    ["install", "--global", PACKAGE_SPEC],
+    {
+      stdio: "inherit",
+    },
+  );
 
   if (installResult.status !== 0) {
     failInstall(`npm install --global ${PACKAGE_SPEC} failed`);
@@ -118,8 +127,12 @@ function runInstall() {
     return;
   }
 
-  logInstall("Roughdraft installed, but the command is not on PATH in this shell yet.");
-  logInstall("You may need to restart your terminal so your global npm bin directory is picked up.");
+  logInstall(
+    "Roughdraft installed, but the command is not on PATH in this shell yet.",
+  );
+  logInstall(
+    "You may need to restart your terminal so your global npm bin directory is picked up.",
+  );
 }
 
 function resolveTargetPath(inputPath) {
@@ -219,9 +232,12 @@ function buildLoopbackUrl(host, port, pathname = "/") {
 async function findRunningRoughdraftPort(port) {
   for (const host of [ROUGHDRAFT_BIND_HOST, ...ROUGHDRAFT_LOOPBACK_HOSTS]) {
     try {
-      const response = await fetch(buildLoopbackUrl(host, port, "/api/status"), {
-        signal: AbortSignal.timeout(750),
-      });
+      const response = await fetch(
+        buildLoopbackUrl(host, port, "/api/status"),
+        {
+          signal: AbortSignal.timeout(750),
+        },
+      );
       if (!response.ok) {
         continue;
       }
@@ -230,9 +246,7 @@ async function findRunningRoughdraftPort(port) {
       if (payload?.backend === "local-files") {
         return port;
       }
-    } catch {
-      continue;
-    }
+    } catch {}
   }
 
   return null;

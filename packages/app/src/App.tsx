@@ -238,28 +238,29 @@ function buildAgentInstallPrompt() {
   ].join("\n");
 }
 
-function Homepage({
-  onOpenDemo,
-}: {
-  onOpenDemo: () => void;
-}) {
+function Homepage({ onOpenDemo }: { onOpenDemo: () => void }) {
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [copyState, setCopyState] = useState<"idle" | "prompt" | "command">("idle");
+  const [copyState, setCopyState] = useState<"idle" | "prompt" | "command">(
+    "idle",
+  );
   const installCommand = getInstallCommand();
   const agentPrompt = buildAgentInstallPrompt();
 
-  const copyText = useCallback(async (text: string, nextState: "prompt" | "command") => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopyState(nextState);
-      window.setTimeout(() => {
-        setCopyState((current) => (current === nextState ? "idle" : current));
-      }, 1800);
-    } catch (error) {
-      console.error("Failed to copy text:", error);
-      setCopyState("idle");
-    }
-  }, []);
+  const copyText = useCallback(
+    async (text: string, nextState: "prompt" | "command") => {
+      try {
+        await navigator.clipboard.writeText(text);
+        setCopyState(nextState);
+        window.setTimeout(() => {
+          setCopyState((current) => (current === nextState ? "idle" : current));
+        }, 1800);
+      } catch (error) {
+        console.error("Failed to copy text:", error);
+        setCopyState("idle");
+      }
+    },
+    [],
+  );
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(235,94,40,0.18),_transparent_28%),radial-gradient(circle_at_80%_20%,_rgba(15,23,42,0.12),_transparent_24%),linear-gradient(180deg,_#fcfaf6_0%,_#f3eee3_100%)] text-slate-950">
@@ -305,9 +306,10 @@ function Homepage({
                 Let your agent wire up the rest.
               </h1>
               <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-700 sm:text-xl">
-                Roughdraft turns markdown review into a local workflow your agent can actually use.
-                Install it, teach your agent to open `.md` files in Roughdraft, and keep comments,
-                revisions, and final edits in normal markdown on disk.
+                Roughdraft turns markdown review into a local workflow your
+                agent can actually use. Install it, teach your agent to open
+                `.md` files in Roughdraft, and keep comments, revisions, and
+                final edits in normal markdown on disk.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -339,7 +341,8 @@ function Homepage({
                     Run one `npx` install command.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    It installs the CLI and appends a marked Roughdraft block to your user-level agent docs.
+                    It installs the CLI and appends a marked Roughdraft block to
+                    your user-level agent docs.
                   </p>
                 </div>
                 <div className="rounded-[28px] border border-white/70 bg-white/72 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -350,7 +353,8 @@ function Homepage({
                     Ask your agent to open the doc.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    The guidance tells it to prefer `roughdraft` whenever you want to review or comment on markdown.
+                    The guidance tells it to prefer `roughdraft` whenever you
+                    want to review or comment on markdown.
                   </p>
                 </div>
                 <div className="rounded-[28px] border border-white/70 bg-white/72 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -361,7 +365,8 @@ function Homepage({
                     Leave comments in normal markdown.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Roughdraft keeps everything local and agent-friendly, so the next pass can happen on the same files.
+                    Roughdraft keeps everything local and agent-friendly, so the
+                    next pass can happen on the same files.
                   </p>
                 </div>
               </div>
@@ -403,15 +408,21 @@ function Homepage({
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
-                    <div className="text-sm font-medium text-white">Updates user guidance</div>
+                    <div className="text-sm font-medium text-white">
+                      Updates user guidance
+                    </div>
                     <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Appends a managed Roughdraft block to `~/CLAUDE.md` and `~/AGENTS.md` if it is not already there.
+                      Appends a managed Roughdraft block to `~/CLAUDE.md` and
+                      `~/AGENTS.md` if it is not already there.
                     </p>
                   </div>
                   <div className="rounded-[20px] border border-white/8 bg-white/5 p-4">
-                    <div className="text-sm font-medium text-white">Keeps the workflow local</div>
+                    <div className="text-sm font-medium text-white">
+                      Keeps the workflow local
+                    </div>
                     <p className="mt-2 text-sm leading-6 text-slate-400">
-                      Your agent opens files with `roughdraft`, and the markdown stays on your machine.
+                      Your agent opens files with `roughdraft`, and the markdown
+                      stays on your machine.
                     </p>
                   </div>
                 </div>
@@ -424,12 +435,14 @@ function Homepage({
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl rounded-[28px] border border-slate-200 bg-[#faf7f1] p-0 text-slate-950 shadow-[0_32px_120px_rgba(15,23,42,0.28)]">
           <div className="border-b border-slate-200 px-6 py-5 sm:px-8">
-              <DialogHeader className="gap-2">
+            <DialogHeader className="gap-2">
               <DialogTitle className="text-2xl font-semibold tracking-[-0.04em] text-slate-950">
                 Copy this prompt into Claude Code or another local agent
               </DialogTitle>
               <DialogDescription className="max-w-2xl text-sm leading-6 text-slate-600">
-                The prompt tells the agent to run `npx --yes roughdraft install`, verify the `roughdraft` CLI, and update `~/CLAUDE.md` plus `~/AGENTS.md` with Roughdraft guidance.
+                The prompt tells the agent to run `npx --yes roughdraft
+                install`, verify the `roughdraft` CLI, and update `~/CLAUDE.md`
+                plus `~/AGENTS.md` with Roughdraft guidance.
               </DialogDescription>
             </DialogHeader>
           </div>
