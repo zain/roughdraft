@@ -76,6 +76,20 @@ describe("toHtml", () => {
       '<img src="./images/sketch.png" alt="Sketch" title="Sketch title" data-markdown-src="./images/sketch.png">',
     );
   });
+
+  it("round-trips headerless HTML tables to valid GFM table markdown", () => {
+    expect(toMarkdown(toHtml(readMarkdownFixture("headerless-table.md")))).toBe(
+      [
+        "# Headerless Table",
+        "",
+        "|     |     |",
+        "| --- | --- |",
+        "| First | Ready |",
+        "| Second | Open |",
+        "",
+      ].join("\n"),
+    );
+  });
 });
 
 describe("toMarkdown", () => {

@@ -5,6 +5,7 @@ import {
   openMarkdownFile,
   readProjectFile,
   removeMarkdownProject,
+  selectRichText,
   writeProjectFile,
 } from "./helpers";
 
@@ -56,6 +57,39 @@ test.describe("CriticMarkup review flows", () => {
 
     logE2eEvent("criticmarkup.reply-saved", {
       file: "comment.md",
+    });
+  });
+
+  test("creates a new root comment and saves it to disk @smoke", async ({
+    page,
+  }) => {
+    const filePath = writeProjectFile(
+      projectDir,
+      "new-comment.md",
+      [
+        "# New Comment",
+        "",
+        "This paragraph has target text to review.",
+        "",
+      ].join("\n"),
+    );
+
+    await openMarkdownFile(page, filePath);
+    await selectRichText(page, "target text");
+    await page.getByRole("button", { name: /Comment/ }).click();
+    await page
+      .getByRole("textbox", { name: "Add your comment" })
+      .fill("Clarify this phrase.");
+    await page.locator('button[aria-label="Save"]:visible').click();
+
+    await expect
+      .poll(() => readProjectFile(projectDir, "new-comment.md"))
+      .toMatch(
+        /\{==target text==\}\{>>Clarify this phrase\.<<\}\{id="c1" by="user" at="[^"]+"\}/,
+      );
+
+    logE2eEvent("criticmarkup.root-comment-saved", {
+      file: "new-comment.md",
     });
   });
 
