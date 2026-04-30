@@ -186,7 +186,11 @@ export class RemoteBackend implements StorageBackend {
     });
 
     source.onerror = () => {
-      this.setSessionStatus("disconnected");
+      // EventSource auto-reconnects on transient errors; only flag the session
+      // as disconnected once the browser has given up and closed the stream.
+      if (source.readyState === EventSource.CLOSED) {
+        this.setSessionStatus("disconnected");
+      }
     };
 
     return () => {

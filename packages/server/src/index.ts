@@ -733,7 +733,7 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
       content,
       version: remoteSessionVersion(content),
       client: null,
-      disconnectedAt: Date.now(),
+      disconnectedAt: null,
     };
     remoteSessions.set(sessionId, session);
 
@@ -789,13 +789,30 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
     session.content = content;
     session.version = remoteSessionVersion(content);
 
+    let deliveredToClient = true;
     if (session.client) {
-      session.client.write(
-        `event: save\ndata: ${JSON.stringify({
-          content: session.content,
-          version: session.version,
-        })}\n\n`,
-      );
+      try {
+        session.client.write(
+          `event: save\ndata: ${JSON.stringify({
+            content: session.content,
+            version: session.version,
+          })}\n\n`,
+        );
+      } catch {
+        deliveredToClient = false;
+        session.client = null;
+        session.disconnectedAt = Date.now();
+      }
+    } else {
+      deliveredToClient = false;
+    }
+
+    if (!deliveredToClient) {
+      res.status(503).json({
+        error: "No active CLI session; save not delivered to disk.",
+        version: session.version,
+      });
+      return;
     }
 
     res.json({ id: session.id, version: session.version });

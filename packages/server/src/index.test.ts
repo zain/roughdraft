@@ -596,9 +596,12 @@ describe("createApp", () => {
     expect(put.status).toBe(404);
   });
 
-  it("updates remote document content and bumps the version on PUT", async () => {
+  it("returns 503 when PUT lands with no active CLI session listener", async () => {
+    // The browser's save is meaningless if no CLI is connected to receive it
+    // and write to disk. Surfacing 503 (instead of silently 200-ing) prevents
+    // the browser from believing a save succeeded that never reached disk.
     const { app } = createApp({ homeDir, staticDirPath: projectDir });
-    const register = await request(app).post("/api/remote-document").send({
+    await request(app).post("/api/remote-document").send({
       sessionId: "s2",
       originPath: "/draft.md",
       content: "v1",
@@ -606,15 +609,14 @@ describe("createApp", () => {
 
     const update = await request(app).put("/api/remote-document/s2").send({
       content: "v2",
-      expectedVersion: register.body.version,
     });
 
-    expect(update.status).toBe(200);
-    expect(update.body.version).not.toBe(register.body.version);
+    expect(update.status).toBe(503);
 
+    // The session content stays on the bumped version so a reconnect-then-fetch
+    // sees the saved bytes, but the browser knows the round-trip to disk failed.
     const fetched = await request(app).get("/api/remote-document/s2");
     expect(fetched.body.content).toBe("v2");
-    expect(fetched.body.version).toBe(update.body.version);
   });
 
   it("returns 409 with current state when expectedVersion is stale", async () => {
@@ -625,6 +627,8 @@ describe("createApp", () => {
       content: "v1",
     });
 
+    // First PUT bumps the version to "v2" (returns 503 because no SSE listener,
+    // but the in-memory content and version are still updated).
     await request(app).put("/api/remote-document/s3").send({
       content: "v2",
       expectedVersion: register.body.version,

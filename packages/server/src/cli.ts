@@ -608,6 +608,20 @@ function printCommandHelp(
     log("  --port <port>        Preferred server port");
     log("  --state-file <path>  Server state file");
     log("  --state-dir <dir>    Directory containing server.json");
+    log("");
+    log("Environment variables:");
+    log(
+      "  ROUGHDRAFT_HOST       Route open through a hosted Roughdraft instance",
+    );
+    log("                        (remote mode). The CLI registers a session,");
+    log("                        opens an SSE channel, and writes save events");
+    log("                        back to disk.");
+    log("  ROUGHDRAFT_NO_OPEN    Set to 1 to suppress browser launch.");
+    log("  ROUGHDRAFT_BIND_HOST  Comma-separated bind hosts for the hosted");
+    log(
+      "                        server (default: loopback). Set to 0.0.0.0 or",
+    );
+    log("                        a Tailscale interface to expose remotely.");
     return;
   }
 
@@ -799,12 +813,15 @@ interface ParsedSseChunk {
 }
 
 function parseSseEvents(buffer: string): ParsedSseChunk {
+  // Normalize CRLF to LF up front so the rest of the parser can treat \n
+  // as the only line terminator. SSE allows \r\n; some proxies rewrite it.
+  const normalized = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const events: SseEvent[] = [];
   let cursor = 0;
   while (true) {
-    const blank = buffer.indexOf("\n\n", cursor);
+    const blank = normalized.indexOf("\n\n", cursor);
     if (blank === -1) break;
-    const block = buffer.slice(cursor, blank);
+    const block = normalized.slice(cursor, blank);
     let eventName = "message";
     const dataLines: string[] = [];
     for (const line of block.split("\n")) {
@@ -819,7 +836,7 @@ function parseSseEvents(buffer: string): ParsedSseChunk {
     }
     cursor = blank + 2;
   }
-  return { events, remainder: buffer.slice(cursor) };
+  return { events, remainder: normalized.slice(cursor) };
 }
 
 async function atomicWriteFile(
@@ -859,6 +876,7 @@ async function runRemoteOpen(
 
   const sessionId = crypto.randomUUID();
 
+  const REGISTER_TIMEOUT_MS = 10_000;
   let registerResponse: Response;
   try {
     registerResponse = await deps.fetchImpl(`${baseUrl}/api/remote-document`, {
@@ -869,6 +887,7 @@ async function runRemoteOpen(
         originPath: options.openPath,
         content,
       }),
+      signal: AbortSignal.timeout(REGISTER_TIMEOUT_MS),
     });
   } catch (error) {
     deps.error(
@@ -920,11 +939,15 @@ async function runRemoteOpen(
     deps.log(`Holding session open for ${options.openPath}. Ctrl-C to exit.`);
   }
 
+  const SSE_CONNECT_TIMEOUT_MS = 10_000;
   let eventsResponse: Response;
   try {
     eventsResponse = await deps.fetchImpl(
       `${baseUrl}/api/remote-document/${encodeURIComponent(sessionId)}/events`,
-      { headers: { Accept: "text/event-stream" } },
+      {
+        headers: { Accept: "text/event-stream" },
+        signal: AbortSignal.timeout(SSE_CONNECT_TIMEOUT_MS),
+      },
     );
   } catch (error) {
     deps.error(
