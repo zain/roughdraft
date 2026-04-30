@@ -345,6 +345,32 @@ function getReusableSuggestionInputMark(
   return $position.nodeAfter?.marks.find(isReusableSuggestionMark) ?? null;
 }
 
+function isSelectionEntirelyAddition(
+  editor: Editor,
+  from: number,
+  to: number,
+): boolean {
+  const markType = editor.state.schema.marks.criticChange;
+  if (!markType) return false;
+
+  const isAdditionKind = (m: ProseMirrorMark) =>
+    m.type === markType &&
+    (m.attrs.kind === "addition" || m.attrs.kind === "substitution-new");
+
+  let allAddition = true;
+  editor.state.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText) return;
+    const segFrom = Math.max(pos, from);
+    const segTo = Math.min(pos + node.nodeSize, to);
+    if (segFrom >= segTo) return;
+    if (!node.marks.some(isAdditionKind)) {
+      allAddition = false;
+    }
+  });
+
+  return allAddition;
+}
+
 function getReusableSuggestionDeletionMark(
   editor: Editor,
   from: number,
@@ -744,7 +770,25 @@ const RichTextEditorSurface = memo(function RichTextEditorSurface({
           const to = selection.to;
           const tr = view.state.tr;
 
-          if (from !== to) {
+          if (
+            from !== to &&
+            isSelectionEntirelyAddition(currentEditor, from, to)
+          ) {
+            const existingMark = getReusableSuggestionInputMark(
+              currentEditor,
+              from,
+            );
+            const mark =
+              existingMark ??
+              view.state.schema.marks.criticChange.create(
+                createCriticChange("addition", undefined, {
+                  existingChanges: getDocumentCriticChanges(currentEditor),
+                }),
+              );
+            tr.delete(from, to);
+            tr.insert(from, view.state.schema.text(text, [mark]));
+            tr.setSelection(TextSelection.create(tr.doc, from + text.length));
+          } else if (from !== to) {
             const oldChange = createCriticChange(
               "substitution-old",
               undefined,
@@ -791,7 +835,25 @@ const RichTextEditorSurface = memo(function RichTextEditorSurface({
 
           const tr = view.state.tr;
 
-          if (from !== to) {
+          if (
+            from !== to &&
+            isSelectionEntirelyAddition(currentEditor, from, to)
+          ) {
+            const existingMark = getReusableSuggestionInputMark(
+              currentEditor,
+              from,
+            );
+            const mark =
+              existingMark ??
+              view.state.schema.marks.criticChange.create(
+                createCriticChange("addition", undefined, {
+                  existingChanges: getDocumentCriticChanges(currentEditor),
+                }),
+              );
+            tr.delete(from, to);
+            tr.insert(from, view.state.schema.text(text, [mark]));
+            tr.setSelection(TextSelection.create(tr.doc, from + text.length));
+          } else if (from !== to) {
             const oldChange = createCriticChange(
               "substitution-old",
               undefined,

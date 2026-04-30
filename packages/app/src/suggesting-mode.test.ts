@@ -129,6 +129,157 @@ function suggestingBackspace(editor: Editor) {
   editor.view.dispatch(tr);
 }
 
+/**
+ * Helper: simulate typing over a range selection in suggesting mode.
+ *
+ * Mirrors the `handleTextInput` logic in PageCard.tsx for the `from !== to`
+ * case. When the selection is entirely within addition/substitution-new
+ * marks, the text is replaced in-place (preserving the addition mark).
+ * Otherwise a substitution is created.
+ */
+function suggestingReplaceRange(editor: Editor, text: string) {
+  const { state } = editor.view;
+  const from = state.selection.from;
+  const to = state.selection.to;
+  if (from === to) {
+    throw new Error("suggestingReplaceRange requires a non-empty selection");
+  }
+
+  const tr = state.tr;
+  const markType = state.schema.marks.criticChange;
+
+  const isAdditionKind = (m: ProseMirrorMark) =>
+    m.type === markType &&
+    (m.attrs.kind === "addition" || m.attrs.kind === "substitution-new");
+
+  let allAddition = true;
+  state.doc.nodesBetween(from, to, (node, pos) => {
+    if (!node.isText) return;
+    const segFrom = Math.max(pos, from);
+    const segTo = Math.min(pos + node.nodeSize, to);
+    if (segFrom >= segTo) return;
+    if (!node.marks.some(isAdditionKind)) {
+      allAddition = false;
+    }
+  });
+
+  if (allAddition) {
+    const $pos = state.doc.resolve(from);
+    const reusableMark =
+      $pos.nodeAfter?.marks.find(isAdditionKind) ??
+      $pos.nodeBefore?.marks.find(isAdditionKind);
+    const mark =
+      reusableMark ??
+      markType.create(
+        createCriticChange("addition", undefined, { existingChanges: [] }),
+      );
+    tr.delete(from, to);
+    tr.insert(from, state.schema.text(text, [mark]));
+    tr.setSelection(TextSelection.create(tr.doc, from + text.length));
+  } else {
+    const oldChange = createCriticChange("substitution-old", undefined, {
+      existingChanges: [],
+    });
+    const newMark = markType.create({ ...oldChange, kind: "substitution-new" });
+    tr.addMark(from, to, markType.create(oldChange));
+    tr.insert(to, state.schema.text(text, [newMark]));
+    tr.setSelection(TextSelection.create(tr.doc, to + text.length));
+  }
+
+  editor.view.dispatch(tr);
+}
+
+describe("suggesting mode type-over inside an insertion", () => {
+  it("should replace addition text in-place when typing over a selection that is entirely within an addition", () => {
+    const editor = createTestEditor("<p>Hello world</p>");
+
+    // Place cursor after "Hello" (position 6)
+    editor.view.dispatch(
+      editor.state.tr.setSelection(TextSelection.create(editor.state.doc, 6)),
+    );
+
+    // Type " threr" in suggesting mode (deliberate typo)
+    for (const char of " threr") {
+      suggestingTypeChar(editor, char);
+    }
+    expect(editor.state.doc.textContent).toBe("Hello threr world");
+
+    // Select "rer" within the addition (positions 10-13)
+    // "Hello threr world"
+    //  12345678901234
+    // Position 1 is start of paragraph. "Hello" is at 1-6, " threr" at 6-12
+    // So "rer" starts at position 9 and ends at 12
+    editor.view.dispatch(
+      editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, 9, 12),
+      ),
+    );
+
+    // Type "ere" to fix the typo — should edit the addition in-place
+    suggestingReplaceRange(editor, "ere");
+
+    // The text should now be "Hello there world"
+    expect(editor.state.doc.textContent).toBe("Hello there world");
+
+    // There should be ONLY addition marks, no substitution marks
+    let hasSubstitutionMark = false;
+    let hasAdditionMark = false;
+    editor.state.doc.descendants((node) => {
+      if (!node.isText) return;
+      for (const mark of node.marks) {
+        if (mark.type.name !== "criticChange") continue;
+        if (
+          mark.attrs.kind === "substitution-old" ||
+          mark.attrs.kind === "substitution-new"
+        ) {
+          hasSubstitutionMark = true;
+        }
+        if (mark.attrs.kind === "addition") {
+          hasAdditionMark = true;
+        }
+      }
+    });
+
+    expect(hasSubstitutionMark).toBe(false);
+    expect(hasAdditionMark).toBe(true);
+
+    editor.destroy();
+  });
+
+  it("should still create a substitution when typing over original (non-addition) text", () => {
+    const editor = createTestEditor("<p>Hello world</p>");
+
+    // Select "world" (positions 7-12)
+    editor.view.dispatch(
+      editor.state.tr.setSelection(
+        TextSelection.create(editor.state.doc, 7, 12),
+      ),
+    );
+
+    // Type "planet" over the selection — should create a substitution
+    suggestingReplaceRange(editor, "planet");
+
+    // Text should include both old and new
+    expect(editor.state.doc.textContent).toBe("Hello worldplanet");
+
+    let hasSubstitutionOld = false;
+    let hasSubstitutionNew = false;
+    editor.state.doc.descendants((node) => {
+      if (!node.isText) return;
+      for (const mark of node.marks) {
+        if (mark.type.name !== "criticChange") continue;
+        if (mark.attrs.kind === "substitution-old") hasSubstitutionOld = true;
+        if (mark.attrs.kind === "substitution-new") hasSubstitutionNew = true;
+      }
+    });
+
+    expect(hasSubstitutionOld).toBe(true);
+    expect(hasSubstitutionNew).toBe(true);
+
+    editor.destroy();
+  });
+});
+
 describe("suggesting mode backspace inside an insertion", () => {
   it("should delete the last character of a suggested insertion rather than marking it as a deletion", () => {
     const editor = createTestEditor("<p>Hello world</p>");
