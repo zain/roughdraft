@@ -5,6 +5,11 @@ export const ROUGHDRAFT_PUBLIC_HOST = "localhost";
 
 export const ROUGHDRAFT_BIND_HOST_ENV = "ROUGHDRAFT_BIND_HOST";
 
+const LOOPBACK_HOST_NAMES = new Set<string>([
+  ...ROUGHDRAFT_LOOPBACK_HOSTS,
+  "localhost",
+]);
+
 export function resolveBindHosts(
   env: NodeJS.ProcessEnv = process.env,
 ): readonly string[] {
@@ -24,4 +29,15 @@ export function resolveBindHosts(
   }
 
   return hosts;
+}
+
+export function isLoopbackHost(host: string): boolean {
+  if (LOOPBACK_HOST_NAMES.has(host)) return true;
+  // Any address in 127.0.0.0/8 is loopback (RFC 5735).
+  if (host.startsWith("127.")) return true;
+  return false;
+}
+
+export function hasNonLoopbackHost(hosts: readonly string[]): boolean {
+  return hosts.some((host) => !isLoopbackHost(host));
 }

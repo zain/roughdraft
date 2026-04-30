@@ -323,6 +323,7 @@ describe("createApp", () => {
         projectPathRequired: true,
         fileSystemBrowsing: true,
         remoteDocuments: true,
+        remoteDocumentTokenRequired: false,
       },
     });
     expect(response.body).not.toHaveProperty("projectDir");
@@ -594,6 +595,80 @@ describe("createApp", () => {
       .put("/api/remote-document/missing")
       .send({ content: "x" });
     expect(put.status).toBe(404);
+  });
+
+  it("rejects remote-document register without a valid token when a token is configured", async () => {
+    const { app } = createApp({
+      homeDir,
+      staticDirPath: projectDir,
+      remoteDocumentToken: "secret-token",
+    });
+
+    const noToken = await request(app).post("/api/remote-document").send({
+      sessionId: "auth-1",
+      originPath: "/work/a.md",
+      content: "x",
+    });
+    expect(noToken.status).toBe(401);
+
+    const wrongToken = await request(app)
+      .post("/api/remote-document")
+      .set("Authorization", "Bearer wrong-token")
+      .send({
+        sessionId: "auth-1",
+        originPath: "/work/a.md",
+        content: "x",
+      });
+    expect(wrongToken.status).toBe(401);
+
+    const ok = await request(app)
+      .post("/api/remote-document")
+      .set("Authorization", "Bearer secret-token")
+      .send({
+        sessionId: "auth-1",
+        originPath: "/work/a.md",
+        content: "x",
+      });
+    expect(ok.status).toBe(201);
+  });
+
+  it("accepts ?token= query for the SSE endpoint when a token is configured", async () => {
+    const { app } = createApp({
+      homeDir,
+      staticDirPath: projectDir,
+      remoteDocumentToken: "secret-token",
+    });
+
+    await request(app)
+      .post("/api/remote-document")
+      .set("Authorization", "Bearer secret-token")
+      .send({ sessionId: "sse-auth", originPath: "/a.md", content: "x" });
+
+    const noToken = await request(app).get("/api/remote-document/sse-auth");
+    expect(noToken.status).toBe(401);
+
+    const queryToken = await request(app)
+      .get("/api/remote-document/sse-auth")
+      .query({ token: "secret-token" });
+    expect(queryToken.status).toBe(200);
+  });
+
+  it("advertises whether a remote-document token is required in /api/status", async () => {
+    const noTokenApp = createApp({ homeDir, staticDirPath: projectDir });
+    const noTokenStatus = await request(noTokenApp.app).get("/api/status");
+    expect(noTokenStatus.body.capabilities.remoteDocumentTokenRequired).toBe(
+      false,
+    );
+
+    const tokenApp = createApp({
+      homeDir,
+      staticDirPath: projectDir,
+      remoteDocumentToken: "secret-token",
+    });
+    const tokenStatus = await request(tokenApp.app).get("/api/status");
+    expect(tokenStatus.body.capabilities.remoteDocumentTokenRequired).toBe(
+      true,
+    );
   });
 
   it("returns 503 when PUT lands with no active CLI session listener", async () => {

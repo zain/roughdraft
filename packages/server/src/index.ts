@@ -8,6 +8,7 @@ import fs from "node:fs";
 import {
   ROUGHDRAFT_DEFAULT_PORT,
   ROUGHDRAFT_PUBLIC_HOST,
+  hasNonLoopbackHost,
   resolveBindHosts,
 } from "./network.js";
 import { resolveUpdateStatus } from "./update-status.js";
@@ -60,6 +61,7 @@ interface CreateAppOptions {
   packageJsonPath?: string;
   fetchImpl?: typeof fetch;
   packageName?: string;
+  remoteDocumentToken?: string;
 }
 
 interface CreateAppResult {
@@ -375,9 +377,38 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   const serverRoot = path.resolve(options.serverRoot ?? defaultServerRoot);
   const staticDirPath = options.staticDirPath ?? staticDir;
   const fetchImpl = options.fetchImpl ?? fetch;
+  const remoteDocumentToken =
+    typeof options.remoteDocumentToken === "string" &&
+    options.remoteDocumentToken.length > 0
+      ? options.remoteDocumentToken
+      : null;
   const app = express();
   const openRequestClients = new Set<OpenRequestClient>();
   const remoteSessions = new Map<string, RemoteSession>();
+
+  function isAuthorizedRemoteDocumentRequest(req: Request): boolean {
+    if (!remoteDocumentToken) return true;
+
+    const header =
+      typeof req.headers.authorization === "string"
+        ? req.headers.authorization
+        : "";
+    if (header.startsWith("Bearer ")) {
+      const supplied = header.slice("Bearer ".length).trim();
+      if (supplied === remoteDocumentToken) return true;
+    }
+
+    const queryToken =
+      typeof req.query.token === "string" ? req.query.token : "";
+    return queryToken === remoteDocumentToken;
+  }
+
+  function rejectUnauthorizedRemoteDocumentRequest(res: Response): void {
+    res.status(401).json({
+      error:
+        "Remote document endpoints require a valid token. Set ROUGHDRAFT_TOKEN on the client or include ?token=... in the URL.",
+    });
+  }
 
   const remoteSessionSweeper = setInterval(() => {
     const now = Date.now();
@@ -631,6 +662,7 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
         projectPathRequired: true,
         fileSystemBrowsing: true,
         remoteDocuments: true,
+        remoteDocumentTokenRequired: remoteDocumentToken !== null,
       },
     });
   });
@@ -701,6 +733,10 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   });
 
   app.post("/api/remote-document", (req, res) => {
+    if (!isAuthorizedRemoteDocumentRequest(req)) {
+      rejectUnauthorizedRemoteDocumentRequest(res);
+      return;
+    }
     const payload = req.body as RemoteDocumentRegisterPayload;
     const sessionId =
       typeof payload.sessionId === "string" &&
@@ -751,6 +787,10 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   });
 
   app.get("/api/remote-document/:id", (req, res) => {
+    if (!isAuthorizedRemoteDocumentRequest(req)) {
+      rejectUnauthorizedRemoteDocumentRequest(res);
+      return;
+    }
     const session = remoteSessions.get(req.params.id);
     if (!session) {
       res.status(404).json({ error: "Remote document session not found" });
@@ -760,6 +800,10 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   });
 
   app.put("/api/remote-document/:id", (req, res) => {
+    if (!isAuthorizedRemoteDocumentRequest(req)) {
+      rejectUnauthorizedRemoteDocumentRequest(res);
+      return;
+    }
     const session = remoteSessions.get(req.params.id);
     if (!session) {
       res.status(404).json({ error: "Remote document session not found" });
@@ -819,6 +863,10 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   });
 
   app.get("/api/remote-document/:id/events", (req, res) => {
+    if (!isAuthorizedRemoteDocumentRequest(req)) {
+      rejectUnauthorizedRemoteDocumentRequest(res);
+      return;
+    }
     const session = remoteSessions.get(req.params.id);
     if (!session) {
       res.status(404).json({ error: "Remote document session not found" });
@@ -1008,14 +1056,34 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   return { app, port };
 }
 
+export const ROUGHDRAFT_TOKEN_ENV = "ROUGHDRAFT_TOKEN";
+
 export async function createServer(
   port = ROUGHDRAFT_DEFAULT_PORT,
   projectDir?: string,
 ): Promise<void> {
-  const { app } = createApp({ port, projectDir });
-  const listeningHosts: string[] = [];
-
   const bindHosts = resolveBindHosts();
+  const remoteDocumentToken = process.env[ROUGHDRAFT_TOKEN_ENV] ?? "";
+
+  if (hasNonLoopbackHost(bindHosts) && remoteDocumentToken.length === 0) {
+    throw new Error(
+      [
+        `Roughdraft refuses to bind ${bindHosts.join(", ")} without a token.`,
+        "Non-loopback bindings expose the remote-document endpoints, which can",
+        "rewrite files on every connected CLI machine. Set ROUGHDRAFT_TOKEN to",
+        "a strong secret and pass the same value to your CLI before retrying,",
+        "or remove ROUGHDRAFT_BIND_HOST to keep loopback-only.",
+      ].join(" "),
+    );
+  }
+
+  const { app } = createApp({
+    port,
+    projectDir,
+    remoteDocumentToken:
+      remoteDocumentToken.length > 0 ? remoteDocumentToken : undefined,
+  });
+  const listeningHosts: string[] = [];
 
   await Promise.all(
     bindHosts.map(

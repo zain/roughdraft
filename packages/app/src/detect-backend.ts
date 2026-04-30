@@ -9,6 +9,7 @@ export async function detectBackend(): Promise<StorageBackend> {
   }
 
   const sessionId = readSessionIdFromUrl();
+  const token = readTokenFromUrl();
 
   try {
     const res = await fetch("/api/status");
@@ -22,7 +23,7 @@ export async function detectBackend(): Promise<StorageBackend> {
 
       if (sessionId && payload.capabilities?.remoteDocuments) {
         try {
-          return await RemoteBackend.create(sessionId);
+          return await RemoteBackend.create(sessionId, token);
         } catch (error) {
           console.error("Could not initialize remote backend:", error);
         }
@@ -50,4 +51,10 @@ function readSessionIdFromUrl(): string | null {
   const params = new URLSearchParams(window.location.search);
   const session = params.get("session")?.trim();
   return session && session.length > 0 ? session : null;
+}
+
+function readTokenFromUrl(): string {
+  if (typeof window === "undefined") return "";
+  const params = new URLSearchParams(window.location.search);
+  return params.get("token")?.trim() ?? "";
 }

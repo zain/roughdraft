@@ -100,6 +100,15 @@ This feature pushes against two recorded decisions; neither is fatal but both de
 - The hosted Roughdraft is reachable from each SSH box on a stable URL.
 - The CLI process on the SSH box is long-lived enough to hold the SSE/WS open (i.e. the agent doesn't exit immediately after `roughdraft open`).
 
+## Security Model (added 2026-04-30 after code review)
+
+The hosted server is a write-capable peer for every connected CLI: an authenticated PUT triggers a disk rewrite on the source machine. Two layers gate that:
+
+1. **Token-based auth.** A shared secret `ROUGHDRAFT_TOKEN` is required on every `/api/remote-document/*` request when set on the server. The CLI sends it via `Authorization: Bearer`; the browser viewer URL embeds it as `?token=...` so the frontend forwards it on fetches and EventSource. The server rejects unauthenticated requests with 401 and a remediation hint.
+2. **Secure-by-default startup.** `createServer()` refuses to bind to a non-loopback host (e.g. `0.0.0.0` for Tailscale exposure) unless `ROUGHDRAFT_TOKEN` is set. Loopback-only deployments stay back-compatible — no token, no behavior change.
+
+The trust model is "Tailscale ACLs + a shared token." We are not solving multi-user collaboration, end-to-end encryption beyond TLS, or token rotation. Compromise of the host still implies file overwrites on connected CLIs; the token is defense in depth, not a complete answer.
+
 ## Open Questions
 
 - **Save-back mechanism**: SSE (server-sent events, simpler) vs WebSocket (bidirectional, easier for ack). Either works; planning decision.

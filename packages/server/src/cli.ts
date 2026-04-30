@@ -616,12 +616,19 @@ function printCommandHelp(
     log("                        (remote mode). The CLI registers a session,");
     log("                        opens an SSE channel, and writes save events");
     log("                        back to disk.");
+    log(
+      "  ROUGHDRAFT_TOKEN      Bearer token sent on remote-document requests.",
+    );
+    log("                        Required when the hosted server binds to a");
+    log("                        non-loopback host. Must match the value the");
+    log("                        hosted server was started with.");
     log("  ROUGHDRAFT_NO_OPEN    Set to 1 to suppress browser launch.");
     log("  ROUGHDRAFT_BIND_HOST  Comma-separated bind hosts for the hosted");
     log(
       "                        server (default: loopback). Set to 0.0.0.0 or",
     );
     log("                        a Tailscale interface to expose remotely.");
+    log("                        Requires ROUGHDRAFT_TOKEN.");
     return;
   }
 
@@ -848,6 +855,20 @@ async function atomicWriteFile(
   await fs.promises.rename(tmpPath, targetPath);
 }
 
+function appendTokenToViewerUrl(viewerUrl: string, token: string): string {
+  if (token.length === 0) return viewerUrl;
+  try {
+    const parsed = new URL(viewerUrl);
+    parsed.searchParams.set("token", token);
+    return parsed.toString();
+  } catch {
+    // Fall back to a simple suffix if the URL is malformed; the browser will
+    // reject it the same way it would have without the token.
+    const separator = viewerUrl.includes("?") ? "&" : "?";
+    return `${viewerUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
+}
+
 interface RemoteOpenOptions {
   host: string;
   openPath: string;
@@ -861,6 +882,12 @@ async function runRemoteOpen(
   options: RemoteOpenOptions,
 ): Promise<number> {
   const baseUrl = options.host.replace(/\/$/, "");
+  const remoteToken =
+    typeof deps.env.ROUGHDRAFT_TOKEN === "string"
+      ? deps.env.ROUGHDRAFT_TOKEN.trim()
+      : "";
+  const authHeaders: Record<string, string> =
+    remoteToken.length > 0 ? { Authorization: `Bearer ${remoteToken}` } : {};
 
   let content: string;
   try {
@@ -881,7 +908,7 @@ async function runRemoteOpen(
   try {
     registerResponse = await deps.fetchImpl(`${baseUrl}/api/remote-document`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({
         sessionId,
         originPath: options.openPath,
@@ -899,9 +926,15 @@ async function runRemoteOpen(
   }
 
   if (!registerResponse.ok) {
-    deps.error(
-      `Remote host rejected the session register (HTTP ${registerResponse.status}).`,
-    );
+    if (registerResponse.status === 401) {
+      deps.error(
+        `Remote host rejected the session register (HTTP 401). Set ROUGHDRAFT_TOKEN to the token configured on the host before retrying.`,
+      );
+    } else {
+      deps.error(
+        `Remote host rejected the session register (HTTP ${registerResponse.status}).`,
+      );
+    }
     return 1;
   }
 
@@ -911,10 +944,15 @@ async function runRemoteOpen(
     viewerUrl?: string;
   };
 
-  const viewerUrl =
+  // The browser viewer must include the same token so its fetches and
+  // EventSource connection authenticate. The server's viewerUrl response field
+  // is unaware of the token (it doesn't see secrets in plaintext over the wire
+  // unless we add them); the CLI knows the token and can append it.
+  const baseViewer =
     typeof registerPayload.viewerUrl === "string"
       ? registerPayload.viewerUrl
       : `${baseUrl}/?session=${encodeURIComponent(sessionId)}`;
+  const viewerUrl = appendTokenToViewerUrl(baseViewer, remoteToken);
 
   if (options.printUrl) {
     deps.log(viewerUrl);
@@ -945,7 +983,7 @@ async function runRemoteOpen(
     eventsResponse = await deps.fetchImpl(
       `${baseUrl}/api/remote-document/${encodeURIComponent(sessionId)}/events`,
       {
-        headers: { Accept: "text/event-stream" },
+        headers: { Accept: "text/event-stream", ...authHeaders },
         signal: AbortSignal.timeout(SSE_CONNECT_TIMEOUT_MS),
       },
     );

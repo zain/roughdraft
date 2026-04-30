@@ -23,15 +23,26 @@ export class RemoteBackend implements StorageBackend {
 
   private bootstrap: RemoteDocumentPayload;
   private statusListeners = new Set<(status: RemoteSessionStatus) => void>();
+  private token: string;
 
-  constructor(info: BackendInfo, bootstrap: RemoteDocumentPayload) {
+  constructor(info: BackendInfo, bootstrap: RemoteDocumentPayload, token = "") {
     this.info = info;
     this.bootstrap = bootstrap;
+    this.token = token;
   }
 
-  static async create(sessionId: string): Promise<RemoteBackend> {
+  private authHeaders(): Record<string, string> {
+    return this.token.length > 0
+      ? { Authorization: `Bearer ${this.token}` }
+      : {};
+  }
+
+  static async create(sessionId: string, token = ""): Promise<RemoteBackend> {
+    const headers: Record<string, string> =
+      token.length > 0 ? { Authorization: `Bearer ${token}` } : {};
     const response = await fetch(
       `/api/remote-document/${encodeURIComponent(sessionId)}`,
+      { headers },
     );
     if (!response.ok) {
       throw new Error(
@@ -49,6 +60,7 @@ export class RemoteBackend implements StorageBackend {
         originPath: bootstrap.originPath,
       },
       bootstrap,
+      token,
     );
   }
 
@@ -90,6 +102,7 @@ export class RemoteBackend implements StorageBackend {
     }
     const response = await fetch(
       `/api/remote-document/${encodeURIComponent(sessionId)}`,
+      { headers: this.authHeaders() },
     );
     if (!response.ok) {
       throw new Error(
@@ -114,7 +127,10 @@ export class RemoteBackend implements StorageBackend {
       `/api/remote-document/${encodeURIComponent(sessionId)}`,
       {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...this.authHeaders(),
+        },
         body: JSON.stringify({ content, expectedVersion }),
       },
     );
@@ -151,9 +167,17 @@ export class RemoteBackend implements StorageBackend {
     const sessionId = this.info.sessionId;
     if (!sessionId) return () => {};
 
-    const source = new EventSource(
+    // EventSource cannot set custom headers, so the token rides as a query
+    // parameter. The server accepts both `Authorization: Bearer` and ?token=
+    // for the SSE endpoint specifically.
+    const eventsUrl = new URL(
       `/api/remote-document/${encodeURIComponent(sessionId)}/events`,
+      window.location.origin,
     );
+    if (this.token.length > 0) {
+      eventsUrl.searchParams.set("token", this.token);
+    }
+    const source = new EventSource(eventsUrl.toString());
 
     source.addEventListener("connected", () => {
       this.setSessionStatus("connected");

@@ -54,9 +54,50 @@ describe("RemoteBackend", () => {
     const backend = bootstrap();
     const page = await backend.getMarkdownFile("ignored.md");
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/remote-document/session-1");
+    expect(fetchMock).toHaveBeenCalledWith("/api/remote-document/session-1", {
+      headers: {},
+    });
     expect(page.content).toBe("v2");
     expect(page.version).toBe("version-2");
+  });
+
+  it("includes the bearer token on requests when constructed with one", async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            id: "session-1",
+            originPath: "/work/draft.md",
+            content: "v1",
+            version: "v",
+          }),
+          { status: 200 },
+        ),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const backend = new RemoteBackend(
+      {
+        kind: "remote",
+        label: "Remote document",
+        detail: "draft.md",
+        sessionId: "session-1",
+        originPath: "/work/draft.md",
+      },
+      {
+        id: "session-1",
+        originPath: "/work/draft.md",
+        content: "v1",
+        version: "v",
+      },
+      "secret-token",
+    );
+
+    await backend.getMarkdownFile("ignored.md");
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/remote-document/session-1", {
+      headers: { Authorization: "Bearer secret-token" },
+    });
   });
 
   it("saveMarkdownFile PUTs the new content with expectedVersion", async () => {
