@@ -123,6 +123,8 @@ Canonical attributes:
 | `by` | Comments and suggestions | Yes | Author or agent label. `AI` identifies an agent author. |
 | `at` | Comments and suggestions | Yes | ISO 8601 timestamp. |
 | `re` | Comments | No | Parent comment or suggestion id for threaded replies. |
+| `status` | Comments and suggestions | No | Review state. Roughdraft currently writes `resolved` when an item has been addressed. |
+| `resolved` | Comments and suggestions | No | Optional short resolution summary for an item whose `status` is `resolved`. |
 
 Example:
 
@@ -190,4 +192,3 @@ Example:
 ```
 
 Conformance fixtures live in [`fixtures/`](./fixtures/). A parser that claims Roughdraft Flavored Markdown 0.1 support SHOULD pass those examples or document any intentional differences.
-

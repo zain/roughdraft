@@ -337,6 +337,30 @@ describe("Homepage", () => {
     expect(container.textContent).toContain("Live Preview");
     expect(container.textContent).toContain("This draft only lives in memory.");
     expect(container.textContent).toContain("Select this sentence");
+    expect(container.textContent).toContain("I'm done");
     expect(setItem).not.toHaveBeenCalled();
+
+    const doneReviewingButton = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent?.includes("I'm done"),
+    );
+    expect(doneReviewingButton).toBeDefined();
+    if (!doneReviewingButton) {
+      throw new Error("I'm done button not found");
+    }
+    expect(doneReviewingButton.className).toContain("bg-black");
+    expect(doneReviewingButton.className).toContain("font-bold");
+    expect(doneReviewingButton.parentElement?.className).toContain("fixed");
+    expect(doneReviewingButton.parentElement?.className).toContain("top-3");
+    expect(doneReviewingButton.parentElement?.className).toContain("right-3");
+
+    await click(doneReviewingButton);
+
+    expect(document.body.textContent).toContain("Your agent is now working");
+    expect(document.body.textContent).toContain(
+      "replying to comments, questions, and suggestions",
+    );
+    expect(document.body.textContent).toContain("directly editing the doc");
+    expect(container.textContent).toContain("Review ready");
+    expect(container.textContent).toContain("Copy prompt");
   });
 });
