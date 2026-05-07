@@ -2,11 +2,14 @@ import {
   ArrowLeft,
   Braces,
   Check,
+  Code2,
   Copy,
   ExternalLink,
   FileText,
   MessageSquare,
+  MousePointerClick,
   PencilLine,
+  Sparkles,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -85,18 +88,42 @@ const PREVIEW_INITIAL_MARKDOWN = [
   '{==Select this sentence==}{>>Try replying to this comment or suggesting a replacement.<<}{id="preview-comment" by="Roughdraft" at="2026-04-28T12:00:00.000Z"}',
   "",
 ].join("\n");
-const HOMEPAGE_WORKFLOWS = [
+const HOMEPAGE_WORKFLOW_SCENES = [
   {
-    title: "Review an agent's draft",
+    step: "01",
+    title: "Ask for a plan",
     description:
-      "Ask your agent to write a Markdown file, open it in Roughdraft, then leave comments and suggested changes. When you are done, tell the agent to read the file again so it can reply inline or incorporate your feedback.",
-    icon: MessageSquare,
+      "Start in the same agent chat you already use. Ask for a reviewable Markdown plan before implementation begins.",
   },
   {
-    title: "Ask the agent to review yours",
+    step: "02",
+    title: "The agent works normally",
     description:
-      "Start from your own writing and have the agent leave detailed comments, questions, and suggested edits in the document. You can accept the useful parts, push back in replies, or send the file back for another pass.",
-    icon: PencilLine,
+      "It inspects files, runs tools, and drafts the plan in the background. Roughdraft does not replace your agent workflow.",
+  },
+  {
+    step: "03",
+    title: "Roughdraft opens the plan",
+    description:
+      "When the file is ready, the agent opens the Markdown plan in Roughdraft and waits while you review.",
+  },
+  {
+    step: "04",
+    title: "Leave comments and suggestions",
+    description:
+      "Ask questions, redirect priorities, and suggest exact wording inline where the agent can read it later.",
+  },
+  {
+    step: "05",
+    title: "Click Done Reviewing",
+    description:
+      "Roughdraft hands control back to the agent once you are finished with the blocking review step.",
+  },
+  {
+    step: "06",
+    title: "The agent resumes",
+    description:
+      "The next agent turn reads the same Markdown file, sees your comments, and continues with the corrected plan.",
   },
 ] as const;
 const ROUGHDRAFT_MARKDOWN_SYNTAX = [
@@ -331,50 +358,196 @@ export function Homepage({
           />
         </div>
 
-        <RoughdraftFormatDemo />
-
         <section
           aria-labelledby="homepage-workflow-heading"
-          className="mx-auto mt-16 w-full max-w-5xl border-t border-slate-200 dark:border-slate-700 pt-10 text-left"
+          className="homepage-workflow-storyboard mx-auto mt-12 w-full max-w-6xl text-left"
+          data-homepage-workflow-storyboard=""
         >
-          <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div className="grid gap-8 border-b border-slate-200 bg-[#FAFAF8] p-5 dark:border-slate-700 dark:bg-slate-950/60 sm:p-6 lg:grid-cols-[0.72fr_1.28fr] lg:p-8">
             <div>
               <p className="text-xs font-medium tracking-[0.16em] text-stone-500 dark:text-stone-400 uppercase">
-                Review workflow
+                Workflow
               </p>
               <h2
                 className="mt-3 text-3xl leading-tight font-semibold text-balance text-slate-950 dark:text-slate-50 sm:text-4xl"
                 id="homepage-workflow-heading"
               >
-                Pass the same Markdown file back and forth with your agent.
+                Review an agent's plan before it starts coding.
               </h2>
               <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-400">
-                Roughdraft makes review state part of the document, so the next
-                agent turn can see the comments, suggestions, and replies
-                without needing access to a hosted editor.
+                Ask for a plan, mark it up in Roughdraft, click Done Reviewing,
+                and the agent continues from the edited Markdown file.
               </p>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              {HOMEPAGE_WORKFLOWS.map(({ description, icon: Icon, title }) => (
-                <div
-                  className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.3)]"
-                  key={title}
-                >
-                  <div className="flex size-10 items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                    <Icon className="size-4" aria-hidden="true" />
-                  </div>
-                  <h3 className="mt-4 text-base font-semibold text-slate-950 dark:text-slate-50">
-                    {title}
-                  </h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-400">
-                    {description}
-                  </p>
-                </div>
+            <ol className="homepage-workflow-scene-list">
+              {HOMEPAGE_WORKFLOW_SCENES.map((scene, index) => (
+                <HomepageWorkflowScene
+                  active={index === 2 || index === 4}
+                  description={scene.description}
+                  key={scene.step}
+                  step={scene.step}
+                  title={scene.title}
+                />
               ))}
-            </div>
+            </ol>
+          </div>
+
+          <div className="grid gap-4 bg-white p-4 dark:bg-slate-900 sm:p-5 xl:grid-cols-[0.9fr_1.35fr_0.75fr]">
+            <AgentChatMock />
+            <RoughdraftPlanMock />
+            <AgentResumeMock />
           </div>
         </section>
+
+        <RoughdraftFormatDemo />
+      </div>
+    </div>
+  );
+}
+
+function HomepageWorkflowScene({
+  active,
+  description,
+  step,
+  title,
+}: {
+  active?: boolean;
+  description: string;
+  step: string;
+  title: string;
+}) {
+  return (
+    <li
+      className="homepage-workflow-scene min-w-0"
+      data-homepage-workflow-scene=""
+    >
+      <div
+        className={
+          active
+            ? "homepage-workflow-scene-marker homepage-workflow-scene-marker-active"
+            : "homepage-workflow-scene-marker"
+        }
+      >
+        {step}
+      </div>
+      <h3 className="mt-3 text-sm font-semibold text-slate-950 dark:text-slate-50">
+        {title}
+      </h3>
+      <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-400">
+        {description}
+      </p>
+    </li>
+  );
+}
+
+function AgentChatMock() {
+  return (
+    <div className="homepage-workflow-panel homepage-workflow-chat">
+      <div className="homepage-workflow-panel-header">
+        <MessageSquare className="size-3.5" aria-hidden="true" />
+        Agent chat
+      </div>
+      <div className="space-y-3 p-4">
+        <div className="ml-auto max-w-[82%] rounded-lg bg-slate-950 px-3 py-2 text-sm leading-5 text-white dark:bg-slate-100 dark:text-slate-950">
+          Let's make the homepage more persuasive. Write a plan first.
+        </div>
+        <div className="max-w-[86%] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-5 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          I'll inspect the current homepage, draft a Markdown plan, and open it
+          in Roughdraft for review before I code.
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
+          <div className="mb-2 flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
+            <Code2 className="size-3.5" aria-hidden="true" />
+            Tool calls
+          </div>
+          <div>rg "It's just Markdown" packages/app/src</div>
+          <div>sed -n '1,220p' packages/app/src/App.tsx</div>
+          <div>write .context/homepage-conversion-plan.md</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoughdraftPlanMock() {
+  return (
+    <div className="homepage-workflow-panel homepage-workflow-plan">
+      <div className="homepage-workflow-panel-header">
+        <FileText className="size-3.5" aria-hidden="true" />
+        homepage-conversion-plan.md
+      </div>
+      <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_15rem]">
+        <div className="min-w-0 p-5">
+          <p className="text-xs font-medium tracking-[0.14em] text-stone-500 uppercase">
+            Roughdraft
+          </p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950 dark:text-slate-50">
+            Homepage Conversion Plan
+          </h3>
+          <ul className="mt-4 space-y-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
+            <li>Move the workflow story above "It's just Markdown."</li>
+            <li>
+              Show the agent pause, the review window, and the resume signal.
+            </li>
+            <li>
+              Keep the format section as proof that the review data is portable
+              Markdown.
+            </li>
+          </ul>
+          <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-200">
+            Review an agent's plan before it starts coding.
+          </div>
+        </div>
+        <div className="border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/70 lg:border-t-0 lg:border-l">
+          <div className="space-y-3">
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-100">
+              This should go above "It's just Markdown."
+            </div>
+            <div className="rounded-md border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+              Can we make the example about homepage conversion?
+            </div>
+            <div className="rounded-md border border-emerald-200 bg-white p-3 text-xs leading-5 text-emerald-900 dark:border-emerald-900/70 dark:bg-slate-900 dark:text-emerald-200">
+              Suggested change
+              <div className="mt-1 font-medium">
+                Review an agent's plan before it starts coding.
+              </div>
+            </div>
+          </div>
+          <div className="mt-5 flex justify-end">
+            <div className="homepage-workflow-done-popover">
+              <Button className="h-9 gap-2 px-3 text-sm" type="button">
+                <MousePointerClick className="size-4" aria-hidden="true" />
+                Done Reviewing
+              </Button>
+              <div className="homepage-workflow-popover-card">
+                <div className="font-semibold text-slate-950 dark:text-slate-50">
+                  Review complete
+                </div>
+                <div className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">
+                  Your agent can read the edited Markdown file now.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgentResumeMock() {
+  return (
+    <div className="homepage-workflow-panel homepage-workflow-resume">
+      <div className="homepage-workflow-panel-header">
+        <Sparkles className="size-3.5" aria-hidden="true" />
+        Agent resumes
+      </div>
+      <div className="p-4">
+        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+          I read your comments. I'll move the workflow storyboard above the
+          Markdown section and use the homepage conversion example.
+        </div>
       </div>
     </div>
   );

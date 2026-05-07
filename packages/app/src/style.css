@@ -570,6 +570,153 @@
     @apply flex h-10 items-center border-b border-slate-200 px-4 text-xs font-semibold tracking-[0.14em] text-slate-500 uppercase dark:border-slate-700 dark:text-slate-400;
   }
 
+  .homepage-workflow-storyboard {
+    overflow: hidden;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.5rem;
+    background-color: #fff;
+    box-shadow: 0 24px 70px rgb(15 23 42 / 10%);
+  }
+
+  .dark .homepage-workflow-storyboard {
+    border-color: rgb(51 65 85);
+    background-color: rgb(15 23 42);
+    box-shadow: 0 24px 70px rgb(0 0 0 / 35%);
+  }
+
+  .homepage-workflow-scene-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .homepage-workflow-scene {
+    position: relative;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.5rem;
+    background-color: rgb(255 255 255 / 82%);
+    padding: 0.875rem;
+  }
+
+  .dark .homepage-workflow-scene {
+    border-color: rgb(51 65 85);
+    background-color: rgb(15 23 42 / 72%);
+  }
+
+  .homepage-workflow-scene-marker {
+    display: inline-flex;
+    height: 1.75rem;
+    min-width: 1.75rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid rgb(203 213 225);
+    color: rgb(100 116 139);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .homepage-workflow-scene-marker-active {
+    border-color: rgb(15 23 42);
+    background-color: rgb(15 23 42);
+    color: white;
+  }
+
+  .dark .homepage-workflow-scene-marker {
+    border-color: rgb(71 85 105);
+    color: rgb(148 163 184);
+  }
+
+  .dark .homepage-workflow-scene-marker-active {
+    border-color: rgb(241 245 249);
+    background-color: rgb(241 245 249);
+    color: rgb(15 23 42);
+  }
+
+  .homepage-workflow-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.5rem;
+    background-color: rgb(248 250 252);
+  }
+
+  .dark .homepage-workflow-panel {
+    border-color: rgb(51 65 85);
+    background-color: rgb(2 6 23);
+  }
+
+  .homepage-workflow-panel-header {
+    display: flex;
+    height: 2.5rem;
+    align-items: center;
+    gap: 0.375rem;
+    border-bottom: 1px solid rgb(226 232 240);
+    padding: 0 1rem;
+    color: rgb(100 116 139);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .dark .homepage-workflow-panel-header {
+    border-color: rgb(51 65 85);
+    color: rgb(148 163 184);
+  }
+
+  .homepage-workflow-done-popover {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+  }
+
+  .homepage-workflow-popover-card {
+    width: min(13rem, calc(100vw - 3rem));
+    border: 1px solid rgb(226 232 240);
+    border-radius: 0.5rem;
+    background-color: white;
+    padding: 0.75rem;
+    box-shadow: 0 14px 34px rgb(15 23 42 / 14%);
+  }
+
+  .dark .homepage-workflow-popover-card {
+    border-color: rgb(51 65 85);
+    background-color: rgb(15 23 42);
+    box-shadow: 0 14px 34px rgb(0 0 0 / 36%);
+  }
+
+  @media (min-width: 720px) {
+    .homepage-workflow-scene-list {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @media (min-width: 1100px) {
+    .homepage-workflow-scene-list {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    .homepage-workflow-scene:not(:last-child)::after {
+      position: absolute;
+      top: 1.75rem;
+      right: -0.75rem;
+      z-index: 1;
+      width: 0.75rem;
+      height: 1px;
+      background-color: rgb(203 213 225);
+      content: "";
+    }
+
+    .dark .homepage-workflow-scene:not(:last-child)::after {
+      background-color: rgb(71 85 105);
+    }
+  }
+
   .rfm-source-pane,
   .rfm-result-pane {
     border: 0;
