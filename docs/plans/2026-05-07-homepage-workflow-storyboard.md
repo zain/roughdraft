@@ -22,6 +22,8 @@ The storyboard should be specifically about reviewing an agent's plan before imp
 
 This also answers the user's confusion about "Medium strategy": the testing strategy should be written down and executed from this plan, not treated as an invisible subagent output.
 
+The user also asked whether the plan is a Markdown file somewhere. The implementer should be explicit in handoff messages that this trycycle plan is the Markdown file at `docs/plans/2026-05-07-homepage-workflow-storyboard.md`, and that the implementation should proceed from that file in the current checkout. Do not add a new approval gate unless the user asks to revise the plan first.
+
 ## Relevant existing context
 
 - ADR 0001 says Roughdraft's unit of work is one Markdown file. The storyboard should show `homepage-conversion-plan.md`, not projects, vaults, or multi-file workspaces.
@@ -296,7 +298,6 @@ import {
   ArrowLeft,
   Braces,
   Check,
-  CircleDot,
   Code2,
   Copy,
   ExternalLink,
@@ -304,7 +305,6 @@ import {
   MessageSquare,
   MousePointerClick,
   PencilLine,
-  Play,
   Sparkles,
 } from "lucide-react";
 ```
