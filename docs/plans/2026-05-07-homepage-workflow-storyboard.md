@@ -20,16 +20,16 @@ The storyboard should be specifically about reviewing an agent's plan before imp
 
 > Review an agent's plan before it starts coding.
 
-This also answers the user's confusion about "Medium strategy": the testing strategy should be written down and executed from this plan, not treated as an invisible subagent output.
+This also answers the user's confusion about "Medium strategy": the testing strategy should be written down and executed from this plan, not treated as an invisible subagent output. If the user asks again where the strategy or plan lives, answer directly: yes, it is this Markdown file at `docs/plans/2026-05-07-homepage-workflow-storyboard.md`.
 
-The user also asked whether the plan is a Markdown file somewhere. The implementer should be explicit in handoff messages that this trycycle plan is the Markdown file at `docs/plans/2026-05-07-homepage-workflow-storyboard.md`, and that the implementation should proceed from that file in the current checkout. Do not add a new approval gate unless the user asks to revise the plan first.
+Do not add a new approval gate unless the user asks to revise the plan first. The user already asked to run trycycle in the current checkout, and this plan is the execution source of truth.
 
 ## Relevant existing context
 
-- ADR 0001 says Roughdraft's unit of work is one Markdown file. The storyboard should show `homepage-conversion-plan.md`, not projects, vaults, or multi-file workspaces.
-- ADR 0002 says review feedback is portable CriticMarkup. The storyboard should show inline comments and suggested changes as visible document feedback, not hidden app state.
-- ADR 0003 says Markdown round trips matter. The storyboard should reinforce that the agent resumes by reading the same edited Markdown file.
-- ADR 0004 says the CLI opens/reuses a local server. The storyboard should say Roughdraft opens when the agent is ready, but should not introduce new server or sync claims.
+- `docs/adr/0001-single-local-markdown-file.md` says Roughdraft's unit of work is one Markdown file. The storyboard should show `homepage-conversion-plan.md`, not projects, vaults, or multi-file workspaces.
+- `docs/adr/0002-criticmarkup-as-review-format.md` says review feedback is portable CriticMarkup. The storyboard should show inline comments and suggested changes as visible document feedback, not hidden app state.
+- `docs/adr/0003-markdown-roundtrip-contract.md` says Markdown round trips matter. The storyboard should reinforce that the agent resumes by reading the same edited Markdown file.
+- `docs/adr/0004-cli-server-state-model.md` says the CLI opens/reuses a local server. The storyboard should say Roughdraft opens when the agent is ready, but should not introduce new server or sync claims.
 - `Homepage` currently renders hero -> `sneak-peek.png` -> `RoughdraftFormatDemo` -> a small two-card workflow section. The new storyboard replaces the small section and moves above `RoughdraftFormatDemo`.
 - `homepage.test.tsx` already asserts a lot of homepage copy and structure. Split the new storyboard checks into focused tests instead of making the existing CTA test larger.
 
@@ -251,20 +251,9 @@ it("explains the plan-review workflow as a six-scene storyboard above the Markdo
 });
 ```
 
-**Step 4: Add a focused style-regression assertion**
+Do not add unit assertions that parse `APP_STYLES` for storyboard implementation details. The existing CSS string assertions protect legacy format-demo regressions, but new storyboard layout should be covered by semantic DOM assertions plus Playwright render and mobile-overflow checks. This keeps the new tests behavioral instead of coupling them to a specific CSS spelling.
 
-Add this to the same test after the semantic assertions:
-
-```ts
-expect(APP_STYLES).toMatch(
-  /\.homepage-workflow-storyboard \{[^}]*overflow:\s*hidden;[^}]*border-radius:\s*0\.5rem;/s,
-);
-expect(APP_STYLES).toMatch(
-  /\.homepage-workflow-scene-list \{[^}]*grid-template-columns:\s*repeat\(6,\s*minmax\(0,\s*1fr\)\);/s,
-);
-```
-
-**Step 5: Run the focused test and verify failure**
+**Step 4: Run the focused test and verify failure**
 
 Run:
 
@@ -274,7 +263,7 @@ pnpm --filter @roughdraft/app exec vitest run test/homepage.test.tsx -t "six-sce
 
 Expected: FAIL because `[data-homepage-workflow-storyboard]` does not exist and the section copy is absent.
 
-**Step 6: Commit the failing tests**
+**Step 5: Commit the failing tests**
 
 Only commit if the test fails for the expected missing-storyboard reason.
 
