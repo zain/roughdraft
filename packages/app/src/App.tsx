@@ -9,7 +9,7 @@ import {
   MessageSquare,
   MousePointerClick,
   PencilLine,
-  Sparkles,
+  Terminal,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -229,6 +229,8 @@ export function Homepage({
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
     "idle",
   );
+  const workflowStepRefs = useRef<Record<string, HTMLLIElement | null>>({});
+  const [homepageWorkflowStage, setHomepageWorkflowStage] = useState(1);
 
   const handleCopySetupPrompt = useCallback(async () => {
     try {
@@ -238,6 +240,42 @@ export function Homepage({
     } catch {
       setCopyState("error");
     }
+  }, []);
+
+  useEffect(() => {
+    const updateHomepageWorkflowStage = () => {
+      const pageCanScroll =
+        document.documentElement.scrollHeight > window.innerHeight + 1;
+      if (!pageCanScroll) return;
+
+      let nextStage = 1;
+      for (const [step, element] of Object.entries(workflowStepRefs.current)) {
+        if (!element) continue;
+
+        const stepNumber = Number(step);
+        if (
+          element.getBoundingClientRect().top <= 0 &&
+          stepNumber > nextStage
+        ) {
+          nextStage = stepNumber;
+        }
+      }
+
+      setHomepageWorkflowStage((current) =>
+        current === nextStage ? current : nextStage,
+      );
+    };
+
+    updateHomepageWorkflowStage();
+    window.addEventListener("scroll", updateHomepageWorkflowStage, {
+      passive: true,
+    });
+    window.addEventListener("resize", updateHomepageWorkflowStage);
+
+    return () => {
+      window.removeEventListener("scroll", updateHomepageWorkflowStage);
+      window.removeEventListener("resize", updateHomepageWorkflowStage);
+    };
   }, []);
 
   return (
@@ -363,40 +401,38 @@ export function Homepage({
           className="homepage-workflow-storyboard mx-auto mt-12 w-full max-w-6xl text-left"
           data-homepage-workflow-storyboard=""
         >
-          <div className="grid gap-8 border-b border-slate-200 bg-[#FAFAF8] p-5 dark:border-slate-700 dark:bg-slate-950/60 sm:p-6 lg:grid-cols-[0.72fr_1.28fr] lg:p-8">
-            <div>
-              <p className="text-xs font-medium tracking-[0.16em] text-stone-500 dark:text-stone-400 uppercase">
-                Workflow
-              </p>
-              <h2
-                className="mt-3 text-3xl leading-tight font-semibold text-balance text-slate-950 dark:text-slate-50 sm:text-4xl"
-                id="homepage-workflow-heading"
-              >
-                Review an agent's plan before it starts coding.
-              </h2>
-              <p className="mt-4 text-base leading-7 text-slate-600 dark:text-slate-400">
-                Ask for a plan, mark it up in Roughdraft, click Done Reviewing,
-                and the agent continues from the edited Markdown file.
-              </p>
+          <div className="homepage-workflow-intro">
+            <h2
+              className="text-center text-4xl leading-tight font-semibold text-balance text-slate-950 dark:text-slate-50 sm:text-5xl"
+              id="homepage-workflow-heading"
+            >
+              How it works
+            </h2>
+          </div>
+
+          <div className="homepage-workflow-layout">
+            <div
+              className="homepage-workflow-sticky-visual"
+              data-homepage-workflow-sticky-visual=""
+            >
+              <HomepageWorkflowComposite
+                workflowStage={homepageWorkflowStage}
+              />
             </div>
 
             <ol className="homepage-workflow-scene-list">
-              {HOMEPAGE_WORKFLOW_SCENES.map((scene, index) => (
+              {HOMEPAGE_WORKFLOW_SCENES.map((scene) => (
                 <HomepageWorkflowScene
-                  active={index === 2 || index === 4}
                   description={scene.description}
                   key={scene.step}
+                  sceneRef={(element) => {
+                    workflowStepRefs.current[scene.step] = element;
+                  }}
                   step={scene.step}
                   title={scene.title}
                 />
               ))}
             </ol>
-          </div>
-
-          <div className="grid gap-4 bg-white p-4 dark:bg-slate-900 sm:p-5 xl:grid-cols-[0.9fr_1.35fr_0.75fr]">
-            <AgentChatMock />
-            <RoughdraftPlanMock />
-            <AgentResumeMock />
           </div>
         </section>
 
@@ -407,13 +443,13 @@ export function Homepage({
 }
 
 function HomepageWorkflowScene({
-  active,
   description,
+  sceneRef,
   step,
   title,
 }: {
-  active?: boolean;
   description: string;
+  sceneRef?: (element: HTMLLIElement | null) => void;
   step: string;
   title: string;
 }) {
@@ -421,58 +457,140 @@ function HomepageWorkflowScene({
     <li
       className="homepage-workflow-scene min-w-0"
       data-homepage-workflow-scene=""
+      ref={sceneRef}
     >
-      <div
-        className={
-          active
-            ? "homepage-workflow-scene-marker homepage-workflow-scene-marker-active"
-            : "homepage-workflow-scene-marker"
-        }
-      >
-        {step}
+      <div className="homepage-workflow-scene-copy">
+        <div className="homepage-workflow-scene-marker">{step}</div>
+        <h3 className="mt-5 text-3xl leading-tight font-semibold text-balance text-slate-950 dark:text-slate-50 sm:text-4xl">
+          {title}
+        </h3>
+        <p className="mt-4 max-w-md text-base leading-7 text-slate-600 dark:text-slate-400">
+          {description}
+        </p>
       </div>
-      <h3 className="mt-3 text-sm font-semibold text-slate-950 dark:text-slate-50">
-        {title}
-      </h3>
-      <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-400">
-        {description}
-      </p>
     </li>
   );
 }
 
-function AgentChatMock() {
+function HomepageWorkflowComposite({
+  workflowStage,
+}: {
+  workflowStage: number;
+}) {
   return (
-    <div className="homepage-workflow-panel homepage-workflow-chat">
-      <div className="homepage-workflow-panel-header">
-        <MessageSquare className="size-3.5" aria-hidden="true" />
-        Agent chat
+    <div className="homepage-workflow-composite">
+      <AgentChatMock workflowStage={workflowStage} />
+      <RoughdraftPopupMock visible={workflowStage >= 3} />
+    </div>
+  );
+}
+
+function AgentChatMock({ workflowStage }: { workflowStage: number }) {
+  const showAgentWork = workflowStage >= 2;
+  const showRoughdraftCommand = workflowStage >= 3;
+  const showAgentResume = workflowStage >= 6;
+
+  return (
+    <div
+      className="homepage-workflow-terminal homepage-workflow-chat"
+      data-homepage-workflow-terminal-stage={workflowStage}
+    >
+      <div className="homepage-workflow-terminal-titlebar">
+        <div className="flex items-center gap-1.5" aria-hidden="true">
+          <span className="homepage-workflow-terminal-dot bg-rose-500" />
+          <span className="homepage-workflow-terminal-dot bg-amber-400" />
+          <span className="homepage-workflow-terminal-dot bg-emerald-500" />
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <Terminal className="size-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">local-agent / roughdraft</span>
+        </div>
       </div>
-      <div className="space-y-3 p-4">
-        <div className="ml-auto max-w-[82%] rounded-lg bg-slate-950 px-3 py-2 text-sm leading-5 text-white dark:bg-slate-100 dark:text-slate-950">
-          Let's make the homepage more persuasive. Write a plan first.
+
+      <div className="homepage-workflow-terminal-body">
+        <div className="homepage-workflow-terminal-meta">
+          <div className="font-semibold text-slate-100">Coding agent</div>
+          <div>workspace ~/roughdraft</div>
         </div>
-        <div className="max-w-[86%] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-5 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-          I'll inspect the current homepage, draft a Markdown plan, and open it
-          in Roughdraft for review before I code.
+
+        <div className="homepage-workflow-terminal-user-line">
+          <span className="text-slate-400">›</span>
+          <span>
+            Let's make the homepage more persuasive. Write a plan first.
+          </span>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-400">
-          <div className="mb-2 flex items-center gap-1.5 font-medium text-slate-700 dark:text-slate-300">
-            <Code2 className="size-3.5" aria-hidden="true" />
-            Tool calls
+
+        <div
+          aria-hidden={showAgentWork ? undefined : true}
+          className="homepage-workflow-terminal-reveal-stack"
+          data-agent-work-visible={showAgentWork ? "true" : "false"}
+        >
+          <div className="homepage-workflow-terminal-agent-line homepage-workflow-stream-item homepage-workflow-stream-item-delay-short">
+            <span className="mt-1 size-2 shrink-0 rounded-full bg-slate-100" />
+            <span>
+              I'll inspect the current homepage, draft a Markdown plan, and open
+              it in Roughdraft for review before I code.
+            </span>
           </div>
-          <div>rg "It's just Markdown" packages/app/src</div>
-          <div>sed -n '1,220p' packages/app/src/App.tsx</div>
-          <div>write .context/homepage-conversion-plan.md</div>
+
+          <div className="homepage-workflow-terminal-tools homepage-workflow-stream-item homepage-workflow-stream-item-delay-long">
+            <div className="mb-2 flex items-center gap-1.5 font-medium text-slate-200">
+              <Code2 className="size-3.5" aria-hidden="true" />
+              Tool calls
+            </div>
+            <div>rg "It's just Markdown" packages/app/src</div>
+            <div>sed -n '1,220p' packages/app/src/App.tsx</div>
+            <div>write .context/homepage-conversion-plan.md</div>
+          </div>
+        </div>
+
+        <div
+          aria-hidden={showRoughdraftCommand ? undefined : true}
+          className="homepage-workflow-terminal-command homepage-workflow-stream-item"
+          data-terminal-line-visible={showRoughdraftCommand ? "true" : "false"}
+        >
+          roughdraft open "/workspace/.context/homepage-conversion-plan.md"
+          <div className="mt-2 text-slate-400">
+            Waiting for Done Reviewing...
+          </div>
+        </div>
+
+        <div
+          aria-hidden={showAgentResume ? undefined : true}
+          className="homepage-workflow-terminal-agent-line homepage-workflow-stream-item"
+          data-terminal-line-visible={showAgentResume ? "true" : "false"}
+        >
+          <span className="mt-1 size-2 shrink-0 rounded-full bg-emerald-300" />
+          <span>
+            I read your comments. I'll move the workflow storyboard above the
+            Markdown section and use the homepage conversion example.
+          </span>
+        </div>
+
+        <div
+          aria-hidden={showAgentWork ? undefined : true}
+          className="homepage-workflow-terminal-input"
+          data-terminal-line-visible={showAgentWork ? "true" : "false"}
+        >
+          <span className="text-slate-100">›</span>
+          <span
+            className="homepage-workflow-terminal-caret"
+            aria-hidden="true"
+          />
         </div>
       </div>
     </div>
   );
 }
 
-function RoughdraftPlanMock() {
+function RoughdraftPopupMock({ visible }: { visible: boolean }) {
   return (
-    <div className="homepage-workflow-panel homepage-workflow-plan">
+    <div
+      aria-hidden={visible ? undefined : true}
+      className="homepage-workflow-panel homepage-workflow-popup"
+      data-homepage-workflow-popup=""
+      data-popup-visible={visible ? "true" : "false"}
+    >
       <div className="homepage-workflow-panel-header">
         <FileText className="size-3.5" aria-hidden="true" />
         homepage-conversion-plan.md
@@ -498,6 +616,22 @@ function RoughdraftPlanMock() {
           <div className="mt-5 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 dark:border-emerald-900/70 dark:bg-emerald-950/40 dark:text-emerald-200">
             Review an agent's plan before it starts coding.
           </div>
+          <div className="mt-5">
+            <div className="homepage-workflow-done-popover">
+              <Button className="h-10 gap-2 px-4 text-sm" type="button">
+                <MousePointerClick className="size-4" aria-hidden="true" />
+                Done Reviewing
+              </Button>
+              <div className="homepage-workflow-popover-card">
+                <div className="font-semibold text-slate-950 dark:text-slate-50">
+                  Review complete
+                </div>
+                <div className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">
+                  Your agent can read the edited Markdown file now.
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="border-t border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/70 lg:border-t-0 lg:border-l">
           <div className="space-y-3">
@@ -514,39 +648,6 @@ function RoughdraftPlanMock() {
               </div>
             </div>
           </div>
-          <div className="mt-5 flex justify-end">
-            <div className="homepage-workflow-done-popover">
-              <Button className="h-9 gap-2 px-3 text-sm" type="button">
-                <MousePointerClick className="size-4" aria-hidden="true" />
-                Done Reviewing
-              </Button>
-              <div className="homepage-workflow-popover-card">
-                <div className="font-semibold text-slate-950 dark:text-slate-50">
-                  Review complete
-                </div>
-                <div className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-400">
-                  Your agent can read the edited Markdown file now.
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AgentResumeMock() {
-  return (
-    <div className="homepage-workflow-panel homepage-workflow-resume">
-      <div className="homepage-workflow-panel-header">
-        <Sparkles className="size-3.5" aria-hidden="true" />
-        Agent resumes
-      </div>
-      <div className="p-4">
-        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm leading-6 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-          I read your comments. I'll move the workflow storyboard above the
-          Markdown section and use the homepage conversion example.
         </div>
       </div>
     </div>

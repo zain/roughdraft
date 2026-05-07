@@ -277,14 +277,11 @@ describe("Homepage", () => {
     expect(document.body.textContent).toContain("Copied");
   });
 
-  it("explains the plan-review workflow as a six-scene storyboard above the Markdown section", async () => {
+  it("explains the plan-review workflow with scrolling steps and a fixed visual", async () => {
     await renderHomepage(root);
 
     const text = container.textContent ?? "";
-    expect(text).toContain("Review an agent's plan before it starts coding.");
-    expect(text).toContain(
-      "Ask for a plan, mark it up in Roughdraft, click Done Reviewing, and the agent continues from the edited Markdown file.",
-    );
+    expect(text).toContain("How it works");
 
     const storyboard = container.querySelector(
       "[data-homepage-workflow-storyboard]",
@@ -293,6 +290,9 @@ describe("Homepage", () => {
     expect(storyboard?.getAttribute("aria-labelledby")).toBe(
       "homepage-workflow-heading",
     );
+    expect(
+      storyboard.querySelector("#homepage-workflow-heading")?.textContent,
+    ).toBe("How it works");
 
     const markdownDemo = container.querySelector(".rfm-format-demo");
     expect(markdownDemo).not.toBeNull();
@@ -318,6 +318,59 @@ describe("Homepage", () => {
       ...storyboard.querySelectorAll("[data-homepage-workflow-scene]"),
     ];
     expect(sceneNodes).toHaveLength(scenes.length);
+
+    const stickyVisual = storyboard.querySelector(
+      "[data-homepage-workflow-sticky-visual]",
+    );
+    expect(stickyVisual).not.toBeNull();
+    expect(
+      storyboard.querySelectorAll(".homepage-workflow-terminal"),
+    ).toHaveLength(1);
+    expect(
+      storyboard
+        .querySelector(".homepage-workflow-terminal")
+        ?.getAttribute("data-homepage-workflow-terminal-stage"),
+    ).toBe("1");
+    expect(
+      storyboard
+        .querySelector(".homepage-workflow-terminal-reveal-stack")
+        ?.getAttribute("data-agent-work-visible"),
+    ).toBe("false");
+    expect(
+      storyboard
+        .querySelector(".homepage-workflow-terminal-command")
+        ?.getAttribute("data-terminal-line-visible"),
+    ).toBe("false");
+    expect(
+      storyboard
+        .querySelector(".homepage-workflow-terminal-input")
+        ?.getAttribute("data-terminal-line-visible"),
+    ).toBe("false");
+    expect(
+      storyboard.querySelectorAll("[data-homepage-workflow-popup]"),
+    ).toHaveLength(1);
+    expect(
+      storyboard
+        .querySelector("[data-homepage-workflow-popup]")
+        ?.getAttribute("data-popup-visible"),
+    ).toBe("false");
+    expect(
+      storyboard
+        .querySelector("[data-homepage-workflow-popup]")
+        ?.getAttribute("aria-hidden"),
+    ).toBe("true");
+    expect(APP_STYLES).toMatch(
+      /\.homepage-workflow-sticky-visual \{[^}]*position:\s*sticky;[^}]*top:\s*2rem;/s,
+    );
+    expect(APP_STYLES).toMatch(
+      /\.homepage-workflow-popup \{[^}]*position:\s*absolute;[^}]*bottom:\s*1rem;/s,
+    );
+    expect(APP_STYLES).toMatch(
+      /\.homepage-workflow-popup\[data-popup-visible="false"\] \{[^}]*opacity:\s*0;/s,
+    );
+    expect(APP_STYLES).toMatch(
+      /\.homepage-workflow-terminal-reveal-stack\[data-agent-work-visible="false"\] \{[^}]*max-height:\s*0;[^}]*opacity:\s*0;/s,
+    );
 
     scenes.forEach((scene, index) => {
       expect(sceneNodes[index]?.textContent).toContain(
