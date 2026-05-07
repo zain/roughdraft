@@ -1,11 +1,12 @@
-import { act } from "react";
 import type { Editor } from "@tiptap/react";
+import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  type DocumentSaveController,
+  type ManualSaveResult,
   PageCard,
   shouldDismissCommentThread,
-  type DocumentSaveController,
 } from "../src/PageCard";
 import type { Page, StorageBackend } from "../src/storage";
 
@@ -536,7 +537,7 @@ describe("PageCard editor integration", () => {
 
     await insertTextAtEnd(rendered.getEditor(), " failed");
 
-    let result;
+    let result: ManualSaveResult | undefined;
     await act(async () => {
       result = await rendered.getSaveController().flushSave();
     });
@@ -559,7 +560,7 @@ describe("PageCard editor integration", () => {
     await insertTextAtEnd(rendered.getEditor(), " blocked");
     await rendered.rerender({ saveBlocked: true });
 
-    let result;
+    let result: ManualSaveResult | undefined;
     await act(async () => {
       result = await rendered.getSaveController().flushSave();
     });

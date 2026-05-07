@@ -7,10 +7,7 @@ describe("beforeunload save warning", () => {
     [{ isDirty: false, saveState: "saving", diskChangeState: "clean" }, true],
     [{ isDirty: false, saveState: "unsaved", diskChangeState: "clean" }, true],
     [{ isDirty: false, saveState: "error", diskChangeState: "clean" }, true],
-    [
-      { isDirty: false, saveState: "saved", diskChangeState: "conflict" },
-      true,
-    ],
+    [{ isDirty: false, saveState: "saved", diskChangeState: "conflict" }, true],
     [{ isDirty: false, saveState: "saved", diskChangeState: "clean" }, false],
   ] as const)("returns %s for %o", (input, expected) => {
     expect(

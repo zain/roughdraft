@@ -1,25 +1,25 @@
 import type { JSONContent } from "@tiptap/core";
-import type { Editor } from "@tiptap/react";
-import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import type { Mark as ProseMirrorMark } from "@tiptap/pm/model";
 import { TextSelection } from "@tiptap/pm/state";
+import type { Editor } from "@tiptap/react";
+import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CommentEditorList } from "./CommentEditorList";
 import {
-  DocumentReviewRail,
-  type CriticChangeRailItem,
-} from "./DocumentReviewRail";
-import {
+  type CriticChangeAttrs,
+  type CriticComment,
   createCriticChange,
   createCriticComment,
   criticMarkdownHasReviewRail,
   criticMarkdownToEditorState,
   editorStateToCriticMarkdown,
   getCommentDescendantIds,
-  type CriticChangeAttrs,
-  type CriticComment,
 } from "./critic-markup";
+import {
+  type CriticChangeRailItem,
+  DocumentReviewRail,
+} from "./DocumentReviewRail";
 import { getPreferredCommentId, parseCommentIds } from "./document-comments";
 import { EditorContextMenu } from "./EditorContextMenu";
 import {
@@ -2055,7 +2055,9 @@ const PageCardEditorSurface = memo(function PageCardEditorSurface({
     async (nextMarkdown: string): Promise<ManualSaveResult> => {
       if (saveBlocked) {
         onSaveStateChange(
-          nextMarkdown === lastAcceptedMarkdownRef.current ? "saved" : "unsaved",
+          nextMarkdown === lastAcceptedMarkdownRef.current
+            ? "saved"
+            : "unsaved",
         );
         return { status: "blocked" };
       }
@@ -2096,7 +2098,9 @@ const PageCardEditorSurface = memo(function PageCardEditorSurface({
 
       if (saveBlocked) {
         onSaveStateChange(
-          nextMarkdown === lastAcceptedMarkdownRef.current ? "saved" : "unsaved",
+          nextMarkdown === lastAcceptedMarkdownRef.current
+            ? "saved"
+            : "unsaved",
         );
         return;
       }

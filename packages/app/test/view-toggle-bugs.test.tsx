@@ -3,8 +3,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildLocationForDocumentEditorViewMode,
-  getDocumentEditorViewModeFromLocation,
   type DocumentEditorViewMode,
+  getDocumentEditorViewModeFromLocation,
 } from "../src/app-navigation";
 import {
   DocumentSaveStatusIndicator,
@@ -295,17 +295,16 @@ describe("saving/saved status indicator (issue 2 fix)", () => {
     ["saving", "Saving"],
     ["unsaved", "Unsaved changes"],
     ["error", "Save failed"],
-  ] satisfies Array<[DocumentSaveState, string]>)(
-    "shows persistent %s save status",
-    async (saveState, label) => {
-      await renderSaveStatus({ saveState });
+  ] satisfies Array<
+    [DocumentSaveState, string]
+  >)("shows persistent %s save status", async (saveState, label) => {
+    await renderSaveStatus({ saveState });
 
-      expect(
-        container.querySelector(`[role="status"][aria-label="${label}"]`),
-      ).not.toBeNull();
-      expect(container.textContent).toContain(label);
-    },
-  );
+    expect(
+      container.querySelector(`[role="status"][aria-label="${label}"]`),
+    ).not.toBeNull();
+    expect(container.textContent).toContain(label);
+  });
 
   it.each([
     ["changed", "File changed on disk"],
@@ -323,7 +322,9 @@ describe("saving/saved status indicator (issue 2 fix)", () => {
   it("renders save status in the same top-right stack under the handoff button", async () => {
     await renderWorkspace({ watcherCount: 1 });
 
-    const stack = container.querySelector('[data-document-status-stack="true"]');
+    const stack = container.querySelector(
+      '[data-document-status-stack="true"]',
+    );
     expect(stack).not.toBeNull();
     expect(stack?.textContent).toContain("I'm done");
     expect(stack?.textContent).toContain("Saved");
@@ -381,7 +382,9 @@ describe("saving/saved status indicator (issue 2 fix)", () => {
 
     expect(container.textContent).toContain("Save conflict");
     expect(container.textContent).toContain("This file changed on disk");
-    expect(container.querySelector('[aria-label="Save conflict"]')).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="Save conflict"]'),
+    ).not.toBeNull();
   });
 });
 
