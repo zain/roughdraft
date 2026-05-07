@@ -89,4 +89,28 @@ test.describe("markdown round-trips", () => {
       size: fs.statSync(filePath).size,
     });
   });
+
+  test("manual save shortcut flushes code-mode edits to disk @smoke", async ({
+    page,
+  }) => {
+    const initial = ["# Manual Save", "", "Initial body.", ""].join("\n");
+    const filePath = writeProjectFile(projectDir, "manual-save.md", initial);
+
+    await openMarkdownFile(page, filePath, "code");
+    await appendInCodeEditor(page, "\nSaved by shortcut.\n");
+
+    await page.keyboard.press(
+      process.platform === "darwin" ? "Meta+S" : "Control+S",
+    );
+
+    await expect
+      .poll(() => readProjectFile(projectDir, "manual-save.md"))
+      .toContain("Saved by shortcut.");
+    await expect(page.getByRole("status", { name: "Saved" })).toBeVisible();
+
+    logE2eEvent("markdown-roundtrip.manual-save-shortcut", {
+      file: "manual-save.md",
+      size: fs.statSync(filePath).size,
+    });
+  });
 });
