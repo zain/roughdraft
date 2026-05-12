@@ -55,6 +55,12 @@ bun .codex/skills/slog/scripts/slog.ts latest file
 
 Always use shadcn for UI work in this repo. Prefer existing components in `packages/app/src/components/ui/`; when a needed primitive is missing, add it there in the same shadcn style before wiring it into product code.
 
+## UI Screenshot Guide
+
+When changing UI behavior, routes, dialogs, popovers, banners, editor modes, review rail states, or visual error/empty states, update `docs/spec/ui-state-screenshot-guide.md` if the change adds, removes, or materially changes a state that should be captured for visual review.
+
+Keep generated screenshot runs in `.context/ui-state-screenshots/` unless the user explicitly asks to commit visual artifacts.
+
 ## Worktree-Specific CLI
 
 This repo installs a worktree-specific Roughdraft CLI wrapper during setup.
