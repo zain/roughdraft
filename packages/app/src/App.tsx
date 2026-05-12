@@ -911,7 +911,7 @@ function RoughdraftPopupMock({ workflowStage }: { workflowStage: number }) {
         data-testid="homepage-workflow-document-workspace"
       >
         <div
-          className="relative w-full min-w-0 origin-top-left translate-y-[var(--homepage-workflow-document-offset-y)] scale-[var(--homepage-workflow-document-scale)] min-[780px]:w-[calc(100%/var(--homepage-workflow-document-scale))] max-[899px]:w-[calc(100%/var(--homepage-workflow-document-scale))]"
+          className="relative w-full min-w-0 origin-top-left transform-[translateY(var(--homepage-workflow-document-offset-y))_scale(var(--homepage-workflow-document-scale))] min-[780px]:w-[calc(100%/var(--homepage-workflow-document-scale))] max-[899px]:w-[calc(100%/var(--homepage-workflow-document-scale))]"
           data-homepage-workflow-document-scale=""
           data-testid="homepage-workflow-document-scale"
         >
@@ -1039,7 +1039,7 @@ function RoughdraftPopupMock({ workflowStage }: { workflowStage: number }) {
 
                   return (
                     <div
-                      className="absolute right-0 left-0 grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-3 transition-[top] duration-200"
+                      className="homepage-workflow-review-thread absolute right-0 left-0 grid grid-cols-[2rem_minmax(0,1fr)] items-start gap-3 transition-[top] duration-200"
                       key={item.key}
                       ref={(node) => setThreadRef(item.key, node)}
                       style={layout ? { top: layout.railTop } : undefined}
