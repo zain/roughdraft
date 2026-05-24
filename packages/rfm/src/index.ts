@@ -17,7 +17,7 @@ export interface RfmValidationSummary {
 
 export interface RfmValidationResult {
   format: "roughdraft-flavored-markdown";
-  version: "0.1";
+  version: "0.2";
   ok: boolean;
   diagnostics: RfmDiagnostic[];
   errors: RfmDiagnostic[];
@@ -55,7 +55,7 @@ export interface RfmReviewIndexSummary {
 
 export interface RfmReviewIndex {
   format: "roughdraft-flavored-markdown";
-  version: "0.1";
+  version: "0.2";
   items: RfmReviewItem[];
   diagnostics: RfmDiagnostic[];
   summary: RfmReviewIndexSummary;
@@ -132,11 +132,13 @@ interface YamlMetadataEntry {
 interface RoughdraftEndmatter {
   comments: Map<string, YamlMetadataEntry>;
   suggestions: Map<string, YamlMetadataEntry>;
+  data: Record<string, unknown> | null;
   raw: string | null;
   offset: number | null;
   diagnostics: Array<{ code: string; message: string; offset: number }>;
 }
 
+const RFM_VERSION = "0.2" as const;
 const requiredMetadataAttributes = ["id", "by", "at"] as const;
 const dateTimePattern =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -283,9 +285,10 @@ export function validateRoughdraftMarkdown(
   };
 
   let offset = 0;
+  const scanEndOffset = endmatter.offset ?? markdown.length;
   let fence: FenceState | null = null;
 
-  while (offset < markdown.length) {
+  while (offset < scanEndOffset) {
     if (isLineStart(markdown, offset)) {
       const fenceMatch = matchFence(markdown, offset, fence);
       if (fenceMatch) {
@@ -427,7 +430,7 @@ export function validateRoughdraftMarkdown(
 
   return {
     format: "roughdraft-flavored-markdown",
-    version: "0.1",
+    version: RFM_VERSION,
     ok: errors.length === 0,
     diagnostics,
     errors,
@@ -489,9 +492,10 @@ export function extractRoughdraftReviewIndex(markdown: string): RfmReviewIndex {
   };
 
   let offset = 0;
+  const scanEndOffset = endmatter.offset ?? markdown.length;
   let fence: FenceState | null = null;
 
-  while (offset < markdown.length) {
+  while (offset < scanEndOffset) {
     if (isLineStart(markdown, offset)) {
       const fenceMatch = matchFence(markdown, offset, fence);
       if (fenceMatch) {
@@ -572,7 +576,7 @@ export function extractRoughdraftReviewIndex(markdown: string): RfmReviewIndex {
 
   return {
     format: "roughdraft-flavored-markdown",
-    version: "0.1",
+    version: RFM_VERSION,
     items,
     diagnostics: validation.diagnostics,
     summary: {
@@ -963,7 +967,7 @@ function parseMetadata(
     addDiagnostic(
       "error",
       "invalid-metadata-syntax",
-      'Metadata must use quoted attributes such as `{id="c1" by="user" at="2026-04-28T12:00:00.000Z"}`.',
+      "Metadata must use a compact reference such as `{#c1}` backed by final YAML endmatter, or a valid compatibility attribute block.",
       offset,
     );
   }
@@ -1067,17 +1071,21 @@ function parseRoughdraftEndmatter(markdown: string): RoughdraftEndmatter {
   const empty: RoughdraftEndmatter = {
     comments: new Map(),
     suggestions: new Map(),
+    data: null,
     raw: null,
     offset: null,
     diagnostics: [],
   };
   const match = findFinalYamlEndmatter(markdown);
   if (!match) return empty;
+  if (!markdown.slice(0, match.offset).includes("{#")) return empty;
 
   let parsed: unknown;
   try {
     parsed = parseYaml(match.yaml);
   } catch (error) {
+    if (!match.raw.includes("{#")) return empty;
+
     return {
       ...empty,
       raw: match.raw,
@@ -1099,6 +1107,7 @@ function parseRoughdraftEndmatter(markdown: string): RoughdraftEndmatter {
   return {
     comments: readEndmatterEntries(parsed.comments),
     suggestions: readEndmatterEntries(parsed.suggestions),
+    data: parsed,
     raw: match.raw,
     offset: match.offset,
     diagnostics: [],
@@ -1214,12 +1223,16 @@ function writeRoughdraftEndmatter(
     existing.offset === null
       ? markdown.replace(/\s*$/, "\n")
       : markdown.slice(0, existing.offset).replace(/\s*$/, "\n");
-  const data: Record<string, Record<string, YamlMetadataEntry>> = {};
+  const data: Record<string, unknown> = { ...(existing.data ?? {}) };
   if (endmatter.comments.size > 0) {
     data.comments = Object.fromEntries(endmatter.comments);
+  } else {
+    delete data.comments;
   }
   if (endmatter.suggestions.size > 0) {
     data.suggestions = Object.fromEntries(endmatter.suggestions);
+  } else {
+    delete data.suggestions;
   }
 
   return `${body}\n---\n${stringifyYaml(data)}`;

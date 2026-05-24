@@ -1056,7 +1056,7 @@ function printCriticMarkupHelp(log: (message: string) => void) {
   log("");
   log("When adding new review feedback:");
   log(
-    "  Prefer compact references like {>>Comment<<}{#c1} with metadata in YAML endmatter.",
+    "  Prefer compact references like {>>Comment<<}{#c1} with metadata in final YAML endmatter.",
   );
   log(
     "  Use `c1`, `c2`, etc. for comment ids and `s1`, `s2`, etc. for suggested-change ids.",
@@ -1076,6 +1076,14 @@ function printCriticMarkupHelp(log: (message: string) => void) {
   log("Suggested changes with ids:");
   log("  Add {++one concrete example++}{#s1}.");
   log("  Replace {~~vague phrasing~>specific wording~~}{#s2}.");
+  log("  ---");
+  log("  suggestions:");
+  log("    s1:");
+  log("      by: AI");
+  log('      at: "2026-04-28T12:10:00.000Z"');
+  log("    s2:");
+  log("      by: AI");
+  log('      at: "2026-04-28T12:11:00.000Z"');
   log("");
   log("Reply to an existing comment:");
   log("  Store replies in `comments.<id>.body` with `re: <parent-id>`.");

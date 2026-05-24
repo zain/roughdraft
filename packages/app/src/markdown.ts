@@ -1,6 +1,7 @@
 import { tables, taskListItems } from "@joplin/turndown-plugin-gfm";
 import { marked } from "marked";
 import TurndownService from "turndown";
+import { parse as parseYaml } from "yaml";
 
 export const rawMarkdownBlockAttribute = "data-markdown-raw-block";
 
@@ -175,6 +176,31 @@ function isYamlFrontmatterDelimiter(line: string): boolean {
   return /^(?:---|\.\.\.)[ \t]*$/.test(line.replace(/\r$/, ""));
 }
 
+function isReviewEndmatterMap(value: unknown): boolean {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isRoughdraftReviewEndmatter(endmatter: string): boolean {
+  const yamlText = endmatter.replace(/^---[ \t]*(?:\r\n|\n)/, "");
+  let parsed: unknown;
+
+  try {
+    parsed = parseYaml(yamlText);
+  } catch {
+    return false;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return false;
+  }
+
+  const record = parsed as Record<string, unknown>;
+  return (
+    isReviewEndmatterMap(record.comments) ||
+    isReviewEndmatterMap(record.suggestions)
+  );
+}
+
 export function splitYamlFrontmatter(markdown: string): YamlFrontmatterSplit {
   const openingDelimiter = markdown.match(/^---[ \t]*(?:\r\n|\n)/);
   if (!openingDelimiter) return { frontmatter: null, body: markdown };
@@ -236,16 +262,19 @@ export function splitYamlDocumentMetadata(
   }
 
   const endmatter = body.slice(match.index);
-  const yaml = endmatter.replace(/^\n---[ \t]*\r?\n/, "");
+  const candidate = endmatter.replace(/^\n/, "");
 
-  if (!/\b(?:comments|suggestions):/.test(yaml)) {
+  if (
+    !body.slice(0, match.index).includes("{#") ||
+    !isRoughdraftReviewEndmatter(candidate)
+  ) {
     return { frontmatter, body, endmatter: null };
   }
 
   return {
     frontmatter,
     body: body.slice(0, match.index).replace(/\s*$/, "\n"),
-    endmatter: endmatter.replace(/^\n/, ""),
+    endmatter: candidate,
   };
 }
 

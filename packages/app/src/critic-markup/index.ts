@@ -48,6 +48,12 @@ interface CriticCommentToken {
   tokens: Token[];
 }
 
+interface CriticStandaloneCommentToken {
+  type: "criticStandaloneComment";
+  raw: string;
+  commentIds: string[];
+}
+
 interface CriticChangeToken {
   type: "criticChange";
   raw: string;
@@ -70,10 +76,12 @@ const attributeMetadataBlockPattern =
 const metadataAttributePattern =
   /([A-Za-z][A-Za-z0-9_-]*)="((?:\\[\s\S]|[^"\\])*)"/g;
 const metadataReferencePattern = /^\{#([A-Za-z][A-Za-z0-9_-]*)\}$/;
+const unanchoredCommentSentinel = "\u2060";
 
 interface ParsedEndmatter {
   comments: Map<string, Record<string, unknown>>;
   suggestions: Map<string, Record<string, unknown>>;
+  data: Record<string, unknown> | null;
 }
 
 function escapeHtml(value: string): string {
@@ -145,8 +153,10 @@ function parseAttributeMetadata(
 function commentPartialFromEndmatterEntry(
   id: string,
   entry?: Record<string, unknown>,
+  options?: { includeParent?: boolean },
 ): Partial<Omit<CriticComment, "content">> {
   const author = typeof entry?.by === "string" ? entry.by : "user";
+  const includeParent = options?.includeParent ?? true;
 
   return {
     id,
@@ -154,7 +164,8 @@ function commentPartialFromEndmatterEntry(
       typeof entry?.at === "string" ? entry.at : new Date().toISOString(),
     authorType: author.toUpperCase() === "AI" ? "ai" : "user",
     authorId: author.toUpperCase() === "AI" ? null : author,
-    parentCommentId: typeof entry?.re === "string" ? entry.re : null,
+    parentCommentId:
+      includeParent && typeof entry?.re === "string" ? entry.re : null,
   };
 }
 
@@ -172,7 +183,9 @@ function parseMetadata(
       kind === "comment"
         ? endmatter?.comments.get(id)
         : endmatter?.suggestions.get(id);
-    return commentPartialFromEndmatterEntry(id, entry);
+    return commentPartialFromEndmatterEntry(id, entry, {
+      includeParent: false,
+    });
   }
 
   if (attributeMetadataText) {
@@ -210,7 +223,7 @@ function serializeChangeMetadata(change: CriticChangeAttrs): string {
 
 function parseReviewEndmatter(endmatter?: string | null): ParsedEndmatter {
   if (!endmatter) {
-    return { comments: new Map(), suggestions: new Map() };
+    return { comments: new Map(), suggestions: new Map(), data: null };
   }
 
   const yamlText = endmatter.replace(/^---[ \t]*(?:\r\n|\n)/, "");
@@ -218,17 +231,18 @@ function parseReviewEndmatter(endmatter?: string | null): ParsedEndmatter {
   try {
     parsed = parseYaml(yamlText);
   } catch {
-    return { comments: new Map(), suggestions: new Map() };
+    return { comments: new Map(), suggestions: new Map(), data: null };
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { comments: new Map(), suggestions: new Map() };
+    return { comments: new Map(), suggestions: new Map(), data: null };
   }
 
   const record = parsed as Record<string, unknown>;
   return {
     comments: parseEndmatterMap(record.comments),
     suggestions: parseEndmatterMap(record.suggestions),
+    data: record,
   };
 }
 
@@ -257,6 +271,9 @@ function addEndmatterReplies(
     if (typeof entry.body !== "string" || typeof entry.re !== "string") {
       continue;
     }
+    if (comments.has(id)) {
+      continue;
+    }
 
     comments.set(
       id,
@@ -268,34 +285,115 @@ function addEndmatterReplies(
   }
 }
 
+function areEndmatterEntriesEqual(
+  left: Record<string, unknown>,
+  right: Record<string, unknown>,
+): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+
+  for (const key of keys) {
+    if (left[key] !== right[key]) return false;
+  }
+
+  return true;
+}
+
+function areEndmatterMapsEqual(
+  left: Map<string, Record<string, unknown>>,
+  right: Map<string, Record<string, unknown>>,
+): boolean {
+  if (left.size !== right.size) return false;
+
+  for (const [id, leftEntry] of left) {
+    const rightEntry = right.get(id);
+    if (!rightEntry || !areEndmatterEntriesEqual(leftEntry, rightEntry)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function endmatterEntryForComment(
+  comment: CriticComment,
+  existing: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const by = comment.authorType === "ai" ? "AI" : comment.authorId || "user";
+  const next: Record<string, unknown> = {
+    ...existing,
+    by,
+    at: comment.createdAt,
+  };
+
+  if (comment.parentCommentId) {
+    next.body = comment.content;
+    next.re = comment.parentCommentId;
+  } else {
+    delete next.body;
+    delete next.re;
+  }
+
+  return next;
+}
+
+function endmatterEntryForChange(
+  change: CriticChangeAttrs,
+  existing: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const by = change.authorType === "ai" ? "AI" : change.authorId || "user";
+
+  return {
+    ...existing,
+    by,
+    at: change.createdAt,
+  };
+}
+
 function serializeReviewEndmatter(
   existingEndmatter: string | null,
   comments: Map<string, CriticComment>,
+  changes: Map<string, CriticChangeAttrs>,
 ): string | null {
   if (!existingEndmatter) return null;
 
   const parsed = parseReviewEndmatter(existingEndmatter);
-  const commentEntries = new Map(parsed.comments);
+  const commentEntries = new Map<string, Record<string, unknown>>();
+  const suggestionEntries = new Map<string, Record<string, unknown>>();
 
   for (const comment of comments.values()) {
-    const by = comment.authorType === "ai" ? "AI" : comment.authorId || "user";
-    const existing = commentEntries.get(comment.id) ?? {};
-    commentEntries.set(comment.id, {
-      ...existing,
-      ...(comment.parentCommentId ? { body: comment.content } : {}),
-      by,
-      at: comment.createdAt,
-      ...(comment.parentCommentId ? { re: comment.parentCommentId } : {}),
-    });
+    commentEntries.set(
+      comment.id,
+      endmatterEntryForComment(comment, parsed.comments.get(comment.id)),
+    );
   }
 
-  const data: Record<string, unknown> = {};
+  for (const change of changes.values()) {
+    suggestionEntries.set(
+      change.changeId,
+      endmatterEntryForChange(change, parsed.suggestions.get(change.changeId)),
+    );
+  }
+
+  if (
+    areEndmatterMapsEqual(parsed.comments, commentEntries) &&
+    areEndmatterMapsEqual(parsed.suggestions, suggestionEntries)
+  ) {
+    return existingEndmatter;
+  }
+
+  const data: Record<string, unknown> = { ...(parsed.data ?? {}) };
   if (commentEntries.size > 0) {
     data.comments = Object.fromEntries(commentEntries);
+  } else {
+    delete data.comments;
   }
-  if (parsed.suggestions.size > 0) {
-    data.suggestions = Object.fromEntries(parsed.suggestions);
+  if (suggestionEntries.size > 0) {
+    data.suggestions = Object.fromEntries(suggestionEntries);
+  } else {
+    delete data.suggestions;
   }
+
+  if (Object.keys(data).length === 0) return null;
 
   return `---\n${stringifyYaml(data)}`;
 }
@@ -657,6 +755,35 @@ function tokenizeCriticCommentBlocks(
   };
 }
 
+function tokenizeCriticStandaloneComment(
+  src: string,
+  existingComments: Iterable<Pick<CriticComment, "id">>,
+  endmatter?: ParsedEndmatter,
+):
+  | {
+      token: CriticStandaloneCommentToken;
+      comments: CriticComment[];
+    }
+  | undefined {
+  const result = tokenizeCriticCommentBlocks(
+    src,
+    0,
+    existingComments,
+    endmatter,
+  );
+
+  if (result.comments.length === 0) return undefined;
+
+  return {
+    token: {
+      type: "criticStandaloneComment",
+      raw: result.raw,
+      commentIds: result.comments.map((comment) => comment.id),
+    },
+    comments: result.comments,
+  };
+}
+
 function tokenizeCriticChange(
   lexer: TokenizerThis["lexer"],
   src: string,
@@ -914,6 +1041,7 @@ function addCriticCommentRule(
         useEndmatter,
       );
       if (!commentBlocks) return content;
+      if (content === unanchoredCommentSentinel) return commentBlocks;
 
       return `{==${content}==}${commentBlocks}`;
     },
@@ -1157,6 +1285,32 @@ function createCriticMarked(
         childTokens: ["tokens"],
       } satisfies TokenizerAndRendererExtension,
       {
+        name: "criticStandaloneComment",
+        level: "inline",
+        start(src: string) {
+          return src.indexOf("{>>");
+        },
+        tokenizer(src: string) {
+          const result = tokenizeCriticStandaloneComment(
+            src,
+            comments.values(),
+            endmatter,
+          );
+          if (!result) return undefined;
+
+          for (const comment of result.comments) {
+            comments.set(comment.id, comment);
+          }
+          return result.token;
+        },
+        renderer(token: Tokens.Generic) {
+          const criticToken = token as CriticStandaloneCommentToken;
+          return `<span data-comment-ids="${escapeHtml(
+            JSON.stringify(criticToken.commentIds),
+          )}" data-comment-anchorless="true">${unanchoredCommentSentinel}</span>`;
+        },
+      } satisfies TokenizerAndRendererExtension,
+      {
         name: "criticChange",
         level: "inline",
         start(src: string) {
@@ -1236,7 +1390,7 @@ export function criticMarkdownHasReviewRail(
     options,
     parsedEndmatter,
   );
-  parser.parse(body);
+  parser.parse(protectRichTextRoundTripMarkdown(body));
   addEndmatterReplies(comments, parsedEndmatter);
   return comments.size > 0 || changes.size > 0;
 }
@@ -1291,6 +1445,40 @@ export function criticMarkdownToEditorState(
   return { doc, comments, frontmatter, endmatter };
 }
 
+function collectCriticChangesFromDoc(
+  doc: JSONContent,
+): Map<string, CriticChangeAttrs> {
+  const changes = new Map<string, CriticChangeAttrs>();
+  const visit = (node: JSONContent) => {
+    for (const mark of node.marks ?? []) {
+      if (mark.type !== "criticChange") continue;
+
+      const attrs = mark.attrs as Partial<CriticChangeAttrs> | undefined;
+      if (
+        attrs?.changeId &&
+        attrs.kind &&
+        attrs.createdAt &&
+        attrs.authorType
+      ) {
+        changes.set(attrs.changeId, {
+          kind: attrs.kind,
+          changeId: attrs.changeId,
+          createdAt: attrs.createdAt,
+          authorType: attrs.authorType,
+          authorId: attrs.authorId ?? null,
+        });
+      }
+    }
+
+    for (const child of node.content ?? []) {
+      visit(child);
+    }
+  };
+
+  visit(doc);
+  return changes;
+}
+
 export function editorStateToCriticMarkdown(
   doc: JSONContent,
   comments: Map<string, CriticComment>,
@@ -1306,11 +1494,16 @@ export function editorStateToCriticMarkdown(
     options?.endmatter ??
     (doc as JSONContent & { yamlEndmatter?: string }).yamlEndmatter ??
     null;
+  const changes = collectCriticChangesFromDoc(doc);
   const useEndmatter = Boolean(sourceEndmatter);
   addCriticCommentRule(service, comments, useEndmatter);
   addCriticChangeRule(service, comments, useEndmatter);
   addCriticCodeBlockRule(service);
-  const endmatter = serializeReviewEndmatter(sourceEndmatter, comments);
+  const endmatter = serializeReviewEndmatter(
+    sourceEndmatter,
+    comments,
+    changes,
+  );
   return appendYamlEndmatter(
     prependYamlFrontmatter(
       normalizeBlockSpacing(`${service.turndown(html).trimEnd()}\n`),

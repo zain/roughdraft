@@ -58,6 +58,37 @@ describe("validateRoughdraftMarkdown", () => {
     });
   });
 
+  it("does not validate CriticMarkup-looking text inside YAML endmatter bodies", () => {
+    const result = validateRoughdraftMarkdown(
+      [
+        "Please revisit {==this sentence==}{>>Needs a source.<<}{#c1}.",
+        "",
+        "---",
+        "comments:",
+        "  c1:",
+        "    by: user",
+        '    at: "2026-04-28T12:00:00.000Z"',
+        "  c2:",
+        "    body: Contains {++not a live suggestion++} in the reply.",
+        "    by: AI",
+        '    at: "2026-04-28T12:05:00.000Z"',
+        "    re: c1",
+        "",
+      ].join("\n"),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.summary).toMatchObject({
+      comments: 2,
+      suggestions: 0,
+    });
+  });
+
+  it("reports the RFM 0.2 format version", () => {
+    expect(validateRoughdraftMarkdown("").version).toBe("0.2");
+  });
+
   it("reports a missing YAML endmatter entry for compact references", () => {
     expect(codes("{>>Needs metadata<<}{#c1}\n")).toContain(
       "missing-endmatter-entry",
@@ -96,6 +127,52 @@ describe("validateRoughdraftMarkdown", () => {
         "This is {++not a suggestion++}.",
         "```",
         "Literal `{>>not a comment<<}` text.",
+      ].join("\n"),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.summary).toMatchObject({
+      comments: 0,
+      suggestions: 0,
+    });
+  });
+
+  it("does not treat fenced YAML examples as invalid review endmatter", () => {
+    const result = validateRoughdraftMarkdown(
+      [
+        "Doc",
+        "",
+        "```yaml",
+        "---",
+        "comments:",
+        "  c1:",
+        "    by: user",
+        '    at: "2026-04-28T12:00:00.000Z"',
+        "```",
+        "",
+      ].join("\n"),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.diagnostics).toEqual([]);
+    expect(result.summary).toMatchObject({
+      comments: 0,
+      suggestions: 0,
+    });
+  });
+
+  it("does not treat ordinary final comments sections as review endmatter without compact references", () => {
+    const result = validateRoughdraftMarkdown(
+      [
+        "Release notes",
+        "",
+        "---",
+        "comments:",
+        "  c1:",
+        "    by: docs",
+        '    at: "not review metadata"',
+        "",
       ].join("\n"),
     );
 
@@ -264,6 +341,40 @@ describe("extractRoughdraftReviewIndex", () => {
     });
   });
 
+  it("does not extract CriticMarkup-looking text inside YAML endmatter bodies", () => {
+    const index = extractRoughdraftReviewIndex(
+      [
+        "Please revisit {==this sentence==}{>>Needs a source.<<}{#c1}.",
+        "",
+        "---",
+        "comments:",
+        "  c1:",
+        "    by: user",
+        '    at: "2026-04-28T12:00:00.000Z"',
+        "  c2:",
+        "    body: Contains {++not a live suggestion++} in the reply.",
+        "    by: AI",
+        '    at: "2026-04-28T12:05:00.000Z"',
+        "    re: c1",
+        "",
+      ].join("\n"),
+    );
+
+    expect(index.version).toBe("0.2");
+    expect(index.summary).toMatchObject({
+      comments: 1,
+      replies: 1,
+      suggestions: 0,
+    });
+    expect(index.items.map((item) => [item.id, item.kind])).toEqual([
+      ["c1", "comment"],
+      ["c2", "reply"],
+    ]);
+    expect(index.items[1]).toMatchObject({
+      text: "Contains {++not a live suggestion++} in the reply.",
+    });
+  });
+
   it("preserves literal CriticMarkup inside inline code and fenced code blocks", () => {
     const index = extractRoughdraftReviewIndex(
       [
@@ -334,6 +445,8 @@ describe("RFM mutation helpers", () => {
       "Keep {==this claim==}{>>Needs proof<<}{#c1} as written.",
       "",
       "---",
+      "workflow:",
+      "  owner: editorial",
       "comments:",
       "  c1:",
       "    by: user",
@@ -350,6 +463,7 @@ describe("RFM mutation helpers", () => {
     });
 
     expect(updated).not.toContain("{>>Added a citation");
+    expect(updated).toContain("workflow:\n  owner: editorial");
     expect(updated).toContain("body: Added a citation in the next paragraph.");
     expect(extractRoughdraftReviewIndex(updated).items).toEqual(
       expect.arrayContaining([
@@ -396,6 +510,8 @@ describe("RFM mutation helpers", () => {
       "Add {++one example++}{#s1}.",
       "",
       "---",
+      "workflow:",
+      "  owner: editorial",
       "suggestions:",
       "  s1:",
       "    by: AI",
@@ -410,6 +526,7 @@ describe("RFM mutation helpers", () => {
 
     expect(updated).toContain("status: resolved");
     expect(updated).toContain("resolved: Accepted in draft.");
+    expect(updated).toContain("workflow:\n  owner: editorial");
     expect(extractRoughdraftReviewIndex(updated).items[0]).toMatchObject({
       id: "s1",
       status: "resolved",

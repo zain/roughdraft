@@ -11,8 +11,7 @@
       "const": "roughdraft-flavored-markdown"
     },
     "version": {
-      "type": "string",
-      "pattern": "^0\\.[12]$"
+      "const": "0.2"
     },
     "source": {
       "type": "object",

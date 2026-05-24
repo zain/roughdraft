@@ -41,7 +41,13 @@ Comment text is plain inline Markdown content. Comment text MUST NOT contain the
 A comment MAY appear by itself when the feedback applies to the surrounding paragraph or document:
 
 ```markdown
-Add one concrete launch example here.{>>This should come from the customer story.<<}{id="c1" by="user" at="2026-04-28T12:00:00.000Z"}
+Add one concrete launch example here.{>>This should come from the customer story.<<}{#c1}
+
+---
+comments:
+  c1:
+    by: user
+    at: "2026-04-28T12:00:00.000Z"
 ```
 
 ## Anchored Comments
@@ -56,7 +62,13 @@ highlight        = "{==" anchor-text "==}"
 Example:
 
 ```markdown
-Please revisit {==this sentence==}{>>Needs a source.<<}{id="c1" by="user" at="2026-04-28T12:00:00.000Z"}.
+Please revisit {==this sentence==}{>>Needs a source.<<}{#c1}.
+
+---
+comments:
+  c1:
+    by: user
+    at: "2026-04-28T12:00:00.000Z"
 ```
 
 The highlighted text is the visible anchor. Implementations SHOULD attach all immediately following comment blocks to the same anchor until another token interrupts the sequence.
@@ -74,7 +86,13 @@ addition = "{++" new-text "++}" [ metadata ] *comment
 ```
 
 ```markdown
-Add {++one concrete example++}{id="s1" by="AI" at="2026-04-28T12:05:00.000Z"}.
+Add {++one concrete example++}{#s1}.
+
+---
+suggestions:
+  s1:
+    by: AI
+    at: "2026-04-28T12:05:00.000Z"
 ```
 
 ### Deletion
@@ -84,7 +102,13 @@ deletion = "{--" old-text "--}" [ metadata ] *comment
 ```
 
 ```markdown
-Remove {--vague phrasing--}{id="s2" by="user" at="2026-04-28T12:06:00.000Z"}.
+Remove {--vague phrasing--}{#s2}.
+
+---
+suggestions:
+  s2:
+    by: user
+    at: "2026-04-28T12:06:00.000Z"
 ```
 
 ### Substitution
@@ -94,13 +118,31 @@ substitution = "{~~" old-text "~>" new-text "~~}" [ metadata ] *comment
 ```
 
 ```markdown
-Use {~~rough~>specific~~}{id="s3" by="AI" at="2026-04-28T12:07:00.000Z"} wording.
+Use {~~rough~>specific~~}{#s3} wording.
+
+---
+suggestions:
+  s3:
+    by: AI
+    at: "2026-04-28T12:07:00.000Z"
 ```
 
 Trailing comment blocks after a suggestion attach discussion to that suggestion:
 
 ```markdown
-Add {++one concrete example++}{id="s1" by="AI" at="2026-04-28T12:05:00.000Z"}{>>Use the launch story.<<}{id="c2" by="user" at="2026-04-28T12:08:00.000Z" re="s1"}.
+Add {++one concrete example++}{#s1}.
+
+---
+comments:
+  c2:
+    body: Use the launch story.
+    by: user
+    at: "2026-04-28T12:08:00.000Z"
+    re: s1
+suggestions:
+  s1:
+    by: AI
+    at: "2026-04-28T12:05:00.000Z"
 ```
 
 ## Metadata
@@ -175,7 +217,13 @@ Known metadata attributes:
 Example:
 
 ```markdown
-{>>Needs a source.<<}{id="c1" by="user" at="2026-04-28T12:00:00.000Z"}
+{>>Needs a source.<<}{#c1}
+
+---
+comments:
+  c1:
+    by: user
+    at: "2026-04-28T12:00:00.000Z"
 ```
 
 Implementations SHOULD generate simple document-local ids. Roughdraft uses `c1`, `c2`, and so on for comments and `s1`, `s2`, and so on for suggestions. Implementations MUST preserve unknown valid attributes or YAML keys when possible, but they MUST NOT require unknown metadata for correct review rendering.
@@ -187,7 +235,18 @@ For compatibility, readers MAY accept legacy comment metadata of the form `{@id:
 Threading is represented by `re`.
 
 ```markdown
-Review {==this sentence==}{>>Needs a source.<<}{id="c1" by="user" at="2026-04-28T12:00:00.000Z"}{>>I can add one from the intro.<<}{id="c2" by="AI" at="2026-04-28T12:05:00.000Z" re="c1"}.
+Review {==this sentence==}{>>Needs a source.<<}{#c1}.
+
+---
+comments:
+  c1:
+    by: user
+    at: "2026-04-28T12:00:00.000Z"
+  c2:
+    body: I can add one from the intro.
+    by: AI
+    at: "2026-04-28T12:05:00.000Z"
+    re: c1
 ```
 
 A reply whose `re` points to a missing id SHOULD be treated as a top-level comment. A comment MUST NOT be its own parent.
@@ -220,7 +279,7 @@ Example:
   "format": "roughdraft-flavored-markdown",
   "version": "0.1",
   "source": {
-    "markdown": "Please revisit {==this sentence==}{>>Needs a source.<<}{id=\"c1\" by=\"user\" at=\"2026-04-28T12:00:00.000Z\"}.\\n"
+    "markdown": "Please revisit {==this sentence==}{>>Needs a source.<<}{#c1}.\\n\\n---\\ncomments:\\n  c1:\\n    by: user\\n    at: \"2026-04-28T12:00:00.000Z\"\\n"
   },
   "comments": [
     {

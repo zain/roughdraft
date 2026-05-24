@@ -260,7 +260,7 @@ This is {>>a comment<<} in the margin.
 This is {==highlighted==} text.
 ```
 
-Roughdraft extends those markers with compact id references so review state can round-trip through the file. Root comments and suggestions keep an inline anchor such as `{#c1}` or `{#s1}`, while metadata lives in YAML endmatter:
+Roughdraft extends those markers with compact id references so review state can round-trip through the file. Root comments and suggestions keep an inline anchor such as `{#c1}` or `{#s1}`, while metadata lives in final YAML endmatter:
 
 ```markdown
 Please revisit {==this sentence==}{>>Needs a source<<}{#c1}.
