@@ -16,7 +16,6 @@ import {
   resolveBindHosts,
 } from "./network.js";
 import { ReviewEventQueue } from "./review-events.js";
-import { resolveUpdateStatus } from "./update-status.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const staticDir = path.resolve(__dirname, "../../app/dist");
@@ -63,9 +62,6 @@ interface CreateAppOptions {
   serverRoot?: string;
   homeDir?: string;
   staticDirPath?: string;
-  packageJsonPath?: string;
-  fetchImpl?: typeof fetch;
-  packageName?: string;
   remoteDocumentToken?: string;
 }
 
@@ -397,7 +393,6 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
   const homeDir = options.homeDir ?? os.homedir();
   const serverRoot = path.resolve(options.serverRoot ?? defaultServerRoot);
   const staticDirPath = options.staticDirPath ?? staticDir;
-  const fetchImpl = options.fetchImpl ?? fetch;
   const remoteDocumentToken =
     typeof options.remoteDocumentToken === "string" &&
     options.remoteDocumentToken.length > 0
@@ -1084,15 +1079,6 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
         session.viewers.delete(res);
       }
     });
-  });
-
-  app.get("/api/update-status", async (_req, res) => {
-    const updateStatus = await resolveUpdateStatus({
-      fetchImpl,
-      packageJsonPath: options.packageJsonPath,
-      packageName: options.packageName,
-    });
-    res.json(updateStatus);
   });
 
   app.get("/api/directories", (req, res) => {

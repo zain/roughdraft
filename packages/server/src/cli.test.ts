@@ -125,16 +125,6 @@ describe("cli", () => {
       .join("\n")}\n`;
   }
 
-  async function noUpdateStatus() {
-    return {
-      packageName: "roughdraft",
-      currentVersion: "0.1.0",
-      latestVersion: "0.1.0",
-      updateAvailable: false,
-      updateCommand: "npm i -g roughdraft@latest",
-    };
-  }
-
   afterEach(async () => {
     await Promise.all(
       Array.from(serverByPid.values(), (server) => server.close()),
@@ -180,7 +170,6 @@ describe("cli", () => {
         lastOpenedUrl = url;
         return "disabled";
       },
-      resolveUpdateStatus: noUpdateStatus,
       spawnServerProcess: async ({ port, projectDir: nextProjectDir }) => {
         spawnCount += 1;
         const pid = nextPid;
@@ -264,68 +253,6 @@ describe("cli", () => {
       expectedOpenUrl(`http://localhost:${persisted.port}`, documentPath),
     );
     expect(fs.existsSync(getServerStateFilePath(test.deps.env))).toBeTruthy();
-  });
-
-  it("prints an update notice after a successful human-readable command", async () => {
-    const test = createTestDependencies();
-    const documentPath = path.join(projectDir, "draft.md");
-    fs.writeFileSync(documentPath, "# Draft\n");
-
-    const exitCode = await runCli(["open", documentPath, "--no-watch"], {
-      ...test.deps,
-      resolveUpdateStatus: async () => ({
-        packageName: "roughdraft",
-        currentVersion: "0.1.1",
-        latestVersion: "0.1.3",
-        updateAvailable: true,
-        updateCommand: "npm i -g roughdraft@latest",
-      }),
-    });
-
-    expect(exitCode).toBe(0);
-    expect(test.logs.at(-1)).toBe(
-      "Roughdraft update available: 0.1.1 -> 0.1.3. Run `npm i -g roughdraft@latest` to update.",
-    );
-  });
-
-  it("does not add an update notice to JSON command output", async () => {
-    const test = createTestDependencies();
-    const documentPath = path.join(projectDir, "draft.md");
-    fs.writeFileSync(documentPath, "# Draft\n");
-
-    const exitCode = await runCli(
-      ["open", documentPath, "--no-watch", "--json"],
-      {
-        ...test.deps,
-        resolveUpdateStatus: async () => ({
-          packageName: "roughdraft",
-          currentVersion: "0.1.1",
-          latestVersion: "0.1.3",
-          updateAvailable: true,
-          updateCommand: "npm i -g roughdraft@latest",
-        }),
-      },
-    );
-    const payload = parseOnlyJsonLog<{ opened: boolean }>(test.logs);
-
-    expect(exitCode).toBe(0);
-    expect(payload.opened).toBe(true);
-  });
-
-  it("keeps the original command result when the update check fails", async () => {
-    const test = createTestDependencies();
-    const documentPath = path.join(projectDir, "draft.md");
-    fs.writeFileSync(documentPath, "# Draft\n");
-
-    const exitCode = await runCli(["open", documentPath, "--no-watch"], {
-      ...test.deps,
-      resolveUpdateStatus: async () => {
-        throw new Error("registry unavailable");
-      },
-    });
-
-    expect(exitCode).toBe(0);
-    expect(test.logs).not.toContain("registry unavailable");
   });
 
   it("reuses a connected document window before opening another browser window", async () => {
@@ -760,7 +687,6 @@ describe("cli", () => {
       },
       log: () => {},
       error: () => {},
-      resolveUpdateStatus: noUpdateStatus,
     });
 
     const exitCode = await runCli(
@@ -1862,13 +1788,6 @@ describe("runCli open in remote mode", () => {
       log: (m) => logs.push(m),
       error: (m) => errors.push(m),
       openUrl: () => "disabled",
-      resolveUpdateStatus: async () => ({
-        packageName: "roughdraft",
-        currentVersion: "0.1.0",
-        latestVersion: "0.1.0",
-        updateAvailable: false,
-        updateCommand: "",
-      }),
     });
 
     expect(exitCode).toBe(1);
@@ -1892,13 +1811,6 @@ describe("runCli open in remote mode", () => {
         fetchCalls += 1;
         return new Response("", { status: 200 });
       },
-      resolveUpdateStatus: async () => ({
-        packageName: "roughdraft",
-        currentVersion: "0.1.0",
-        latestVersion: "0.1.0",
-        updateAvailable: false,
-        updateCommand: "",
-      }),
     });
 
     expect(exitCode).toBe(1);
@@ -1927,13 +1839,6 @@ describe("runCli open in remote mode", () => {
           openedUrl = url;
           return "disabled";
         },
-        resolveUpdateStatus: async () => ({
-          packageName: "roughdraft",
-          currentVersion: "0.1.0",
-          latestVersion: "0.1.0",
-          updateAvailable: false,
-          updateCommand: "",
-        }),
       });
 
       // Wait for the CLI to register and open the SSE channel.
@@ -2007,13 +1912,6 @@ describe("runCli open in remote mode", () => {
           openedUrl = url;
           return "disabled";
         },
-        resolveUpdateStatus: async () => ({
-          packageName: "roughdraft",
-          currentVersion: "0.1.0",
-          latestVersion: "0.1.0",
-          updateAvailable: false,
-          updateCommand: "",
-        }),
       });
 
       const openDeadline = Date.now() + 4000;
@@ -2115,13 +2013,6 @@ describe("runCli open in remote mode", () => {
           openedUrl = url;
           return "disabled";
         },
-        resolveUpdateStatus: async () => ({
-          packageName: "roughdraft",
-          currentVersion: "0.1.0",
-          latestVersion: "0.1.0",
-          updateAvailable: false,
-          updateCommand: "",
-        }),
       });
 
       const openDeadline = Date.now() + 4000;
@@ -2201,13 +2092,6 @@ describe("runCli open in remote mode", () => {
           openedUrl = url;
           return "disabled";
         },
-        resolveUpdateStatus: async () => ({
-          packageName: "roughdraft",
-          currentVersion: "0.1.0",
-          latestVersion: "0.1.0",
-          updateAvailable: false,
-          updateCommand: "",
-        }),
       }).finally(() => {
         cliSettled = true;
       });
