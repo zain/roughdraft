@@ -1,6 +1,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
-import { createServer as createHttpServer } from "node:http";
+import {
+  createServer as createHttpServer,
+  type Server as HttpServer,
+} from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +19,11 @@ import {
   resolveBindHosts,
 } from "./network.js";
 import { ReviewEventQueue } from "./review-events.js";
+import {
+  createTabSocketServer,
+  type TabSocketFileChangeEvent,
+  type TabSocketOpenRequestEvent,
+} from "./tab-socket.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const staticDir = path.resolve(__dirname, "../../app/dist");
@@ -68,12 +76,13 @@ interface CreateAppOptions {
 interface CreateAppResult {
   app: Express;
   port: number;
+  handleUpgrades: (server: HttpServer) => void;
 }
 
 interface OpenRequestClient {
   id: number;
   path: string | null;
-  response: Response;
+  send: (event: TabSocketOpenRequestEvent) => void;
 }
 
 interface OpenRequestPayload {
@@ -170,6 +179,65 @@ function normalizeOverallComment(input: unknown): string | undefined {
   if (typeof input !== "string") return undefined;
   const trimmed = input.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function watchMarkdownFileOnDisk(
+  absolutePath: string,
+  relativePath: string,
+  emit: (event: TabSocketFileChangeEvent) => void,
+): () => void {
+  const sendChange = (stats: fs.Stats) => {
+    const exists = stats.nlink > 0;
+    emit({
+      path: relativePath,
+      exists,
+      version: exists ? fileVersionFromFile(absolutePath) : null,
+    });
+  };
+
+  const listener = (current: fs.Stats, previous: fs.Stats) => {
+    if (
+      current.mtimeMs === previous.mtimeMs &&
+      current.size === previous.size &&
+      current.nlink === previous.nlink
+    ) {
+      return;
+    }
+
+    sendChange(current);
+  };
+
+  fs.watchFile(absolutePath, { interval: 500 }, listener);
+
+  return () => {
+    fs.unwatchFile(absolutePath, listener);
+  };
+}
+
+function resolveMarkdownFileForSocket(
+  projectPath: string,
+  relativePath: string,
+): { absolutePath: string; version: string } | { error: string } {
+  const trimmed = projectPath.trim();
+  if (!trimmed) {
+    return { error: "projectPath is required" };
+  }
+
+  const projectDir = path.resolve(trimmed);
+  if (!isExistingDirectory(projectDir)) {
+    return { error: "Project directory not found" };
+  }
+
+  const absolutePath = ensureProjectPath(projectDir, relativePath);
+  if (!absolutePath?.toLowerCase().endsWith(".md")) {
+    return { error: "Markdown file not found" };
+  }
+
+  if (!fs.existsSync(absolutePath)) {
+    return { error: "Markdown file not found" };
+  }
+
+  return { absolutePath, version: fileVersionFromFile(absolutePath) };
 }
 
 function markdownPageFromFile(
@@ -587,34 +655,15 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
     res.flushHeaders?.();
     res.write("retry: 1000\n\n");
 
-    const sendChange = (stats: fs.Stats) => {
-      const exists = stats.nlink > 0;
-      res.write(
-        `event: change\ndata: ${JSON.stringify({
-          path: relativePath,
-          exists,
-          version: exists ? fileVersionFromFile(absolutePath) : null,
-        })}\n\n`,
-      );
-    };
+    const stopWatching = watchMarkdownFileOnDisk(
+      absolutePath,
+      relativePath,
+      (event) => {
+        res.write(`event: change\ndata: ${JSON.stringify(event)}\n\n`);
+      },
+    );
 
-    const listener = (current: fs.Stats, previous: fs.Stats) => {
-      if (
-        current.mtimeMs === previous.mtimeMs &&
-        current.size === previous.size &&
-        current.nlink === previous.nlink
-      ) {
-        return;
-      }
-
-      sendChange(current);
-    };
-
-    fs.watchFile(absolutePath, { interval: 500 }, listener);
-
-    req.on("close", () => {
-      fs.unwatchFile(absolutePath, listener);
-    });
+    req.on("close", stopWatching);
   });
 
   app.get("/api/review-index", (req, res) => {
@@ -814,34 +863,51 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
     });
   });
 
+  function registerOpenRequestClient(
+    requestedPath: string | null,
+    send: (event: TabSocketOpenRequestEvent) => void,
+  ): { id: number; unsubscribe: () => void } {
+    const client: OpenRequestClient = {
+      id: nextOpenRequestClientId,
+      path: requestedPath,
+      send,
+    };
+    nextOpenRequestClientId += 1;
+    openRequestClients.add(client);
+
+    return {
+      id: client.id,
+      unsubscribe: () => {
+        openRequestClients.delete(client);
+      },
+    };
+  }
+
   app.get("/api/open-requests", (req, res) => {
     const requestedPath =
       typeof req.query.path === "string" && req.query.path.trim().length > 0
         ? req.query.path.trim()
         : null;
-    const client: OpenRequestClient = {
-      id: nextOpenRequestClientId,
-      path: requestedPath,
-      response: res,
-    };
-    nextOpenRequestClientId += 1;
+    const { id, unsubscribe } = registerOpenRequestClient(
+      requestedPath,
+      (event) => {
+        res.write(`event: open-request\ndata: ${JSON.stringify(event)}\n\n`);
+      },
+    );
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache, no-transform");
     res.setHeader("Connection", "keep-alive");
     res.flushHeaders?.();
-    res.write(
-      `event: connected\ndata: ${JSON.stringify({ id: client.id })}\n\n`,
-    );
+    res.write(`event: connected\ndata: ${JSON.stringify({ id })}\n\n`);
 
-    openRequestClients.add(client);
     const keepAlive = setInterval(() => {
       res.write(": keep-alive\n\n");
     }, 15_000);
 
     req.on("close", () => {
       clearInterval(keepAlive);
-      openRequestClients.delete(client);
+      unsubscribe();
     });
   });
 
@@ -870,12 +936,7 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
       return;
     }
 
-    matchingClient.response.write(
-      `event: open-request\ndata: ${JSON.stringify({
-        path: targetPath,
-        url: targetUrl,
-      })}\n\n`,
-    );
+    matchingClient.send({ path: targetPath, url: targetUrl });
     res.json({ delivered: true });
   });
 
@@ -1220,7 +1281,14 @@ export function createApp(options: CreateAppOptions = {}): CreateAppResult {
     res.sendFile(path.join(staticDirPath, "index.html"));
   });
 
-  return { app, port };
+  const tabSocket = createTabSocketServer({
+    registerOpenRequestClient: (requestedPath, send) =>
+      registerOpenRequestClient(requestedPath, send).unsubscribe,
+    resolveMarkdownFile: resolveMarkdownFileForSocket,
+    watchMarkdownFile: watchMarkdownFileOnDisk,
+  });
+
+  return { app, port, handleUpgrades: tabSocket.handleUpgrades };
 }
 
 export const ROUGHDRAFT_TOKEN_ENV = "ROUGHDRAFT_TOKEN";
@@ -1244,7 +1312,7 @@ export async function createServer(
     );
   }
 
-  const { app } = createApp({
+  const { app, handleUpgrades } = createApp({
     port,
     projectDir,
     remoteDocumentToken:
@@ -1257,6 +1325,7 @@ export async function createServer(
       (host) =>
         new Promise<void>((resolve, reject) => {
           const server = createHttpServer(app);
+          handleUpgrades(server);
 
           server.once("error", (error: NodeJS.ErrnoException) => {
             if (

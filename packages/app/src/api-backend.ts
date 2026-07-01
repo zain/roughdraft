@@ -9,6 +9,7 @@ import {
   type StorageBackend,
   type StoredAsset,
 } from "./storage";
+import { watchServerFile } from "./tab-socket";
 
 export class ApiBackend implements StorageBackend {
   info: BackendInfo;
@@ -90,25 +91,11 @@ export class ApiBackend implements StorageBackend {
     relativePath: string,
     onChange: (event: MarkdownFileChangeEvent) => void,
   ): () => void {
-    const source = new EventSource(
-      this.buildUrl("/api/markdown-file/events", { path: relativePath }),
+    return watchServerFile(
+      this.info.projectPath?.trim() ?? "",
+      relativePath,
+      onChange,
     );
-
-    source.addEventListener("change", (event) => {
-      try {
-        onChange(JSON.parse((event as MessageEvent<string>).data));
-      } catch (error) {
-        console.error("Failed to read markdown file change event:", error);
-      }
-    });
-
-    source.onerror = (error) => {
-      console.error("Markdown file event stream failed:", error);
-    };
-
-    return () => {
-      source.close();
-    };
   }
 
   async completeReview(
